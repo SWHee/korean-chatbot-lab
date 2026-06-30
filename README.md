@@ -12,8 +12,8 @@ loss를 학습했다. 이 코드는
 보존한다.
 
 현재 주력 트랙은 로컬 Hugging Face instruction-tuned 모델로 생성 흐름을 먼저
-구성하는 것이다. 모델 선정, 구현, 검증은 이후 작업에서 진행하며 이 문서에서는
-특정 모델을 미리 확정하지 않는다.
+구성하는 것이다. 첫 모델은 `Qwen/Qwen3-4B-Instruct-2507`로 결정했으며, 아직
+로컬 적재와 생성은 검증하지 않았다.
 
 ## 목표 설계 (아직 미구현)
 
@@ -34,7 +34,10 @@ FastAPI / LangChain RAG / LangGraph
 
 이 선택의 상세 근거는
 [`docs/adr/0001-adopt-pretrained-first.md`](docs/adr/0001-adopt-pretrained-first.md)에
-기록한다.
+기록한다. 첫 모델을 선택한 근거는
+[`docs/adr/0002-select-qwen3.md`](docs/adr/0002-select-qwen3.md), 실제 고민 과정은
+[`docs/devlog/chatbot/model-selection.md`](docs/devlog/chatbot/model-selection.md)에
+남긴다.
 
 ## 예정된 진행 순서
 
@@ -49,7 +52,7 @@ FastAPI / LangChain RAG / LangGraph
 9. 말투나 지시 수행 개선이 필요하다는 근거가 생기면 파인튜닝을 검토한다.
 
 각 단계에서는 함수, 클래스, endpoint 또는 기능 하나씩 구현하고 바로 검증한다.
-미래 단계의 파일은 미리 만들지 않는다.
+미래 단계의 파일이나 디렉터리는 미리 만들지 않는다.
 
 ## 개발 환경
 
@@ -82,7 +85,8 @@ korean-chatbot/
 ├── experiments/
 │   └── from_scratch/
 ├── docs/
-│   └── adr/
+│   ├── adr/
+│   └── devlog/
 ├── .python-version
 ├── pyproject.toml
 └── uv.lock
