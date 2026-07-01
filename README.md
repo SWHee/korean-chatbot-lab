@@ -15,7 +15,7 @@ loss를 학습했다. 이 코드는
 구성하는 것이다. 첫 모델은 `Qwen/Qwen3-4B-Instruct-2507`로 결정했으며, M2 Pro의
 MPS에서 모델을 적재하고 한국어 답변을 생성하는 흐름을 확인했다.
 
-## 목표 설계 (아직 미구현)
+## 현재 설계
 
 주력 코드를 구현할 때 프로젝트가 소유하는 작은 `Generator` 경계를 중심에 둘
 계획이다.
@@ -90,11 +90,12 @@ korean-chatbot/
 ├── src/
 │   └── chatbot/
 │       ├── __init__.py
+│       ├── generator.py
 │       └── main.py
 ├── .python-version
 ├── pyproject.toml
 └── uv.lock
 ```
 
-`main.py`에서 로컬 추론 전체 흐름을 먼저 검증했으며, 다음 단계에서 모델
-생성 책임을 `generator.py`로 분리한다.
+`generator.py`는 모델 적재와 답변 생성을 담당하고, `main.py`는 생성기를
+호출해 결과를 출력한다.
