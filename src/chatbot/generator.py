@@ -1,5 +1,13 @@
+from collections.abc import Iterator
+from threading import Lock, Thread
+
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BatchEncoding,
+    TextIteratorStreamer,
+)
 
 
 MODEL_ID = "Qwen/Qwen3-4B-Instruct-2507"
@@ -27,9 +35,10 @@ class Generator:
             device_map=device,
         )
         self.model.eval()
+        self._generation_lock = Lock()
 
-    def generate(self, prompt: str) -> str:
-        """사용자 문장을 모델 입력으로 바꿔 답변 문자열 반환"""
+    def _prepare_inputs(self, prompt: str) -> BatchEncoding:
+        """사용자 문장을 모델 입력 tensor로 변환"""
         messages = [
             {"role": "user", "content": prompt}
         ]
@@ -42,13 +51,17 @@ class Generator:
         )
 
         # 입력 tensor를 모델과 같은 장치로 이동
-        model_inputs = self.tokenizer(
+        return self.tokenizer(
             [text],
             return_tensors="pt",
         ).to(self.model.device)
 
+    def generate(self, prompt: str) -> str:
+        """사용자 문장을 모델 입력으로 바꿔 답변 문자열 반환"""
+        model_inputs = self._prepare_inputs(prompt)
+
         # 추론 시 gradient 계산 생략
-        with torch.inference_mode():
+        with self._generation_lock, torch.inference_mode():
             generated_ids = self.model.generate(
                 **model_inputs,
                 max_new_tokens=MAX_NEW_TOKENS,
@@ -62,3 +75,35 @@ class Generator:
             response_ids,
             skip_special_tokens=True,
         )[0]
+
+    def _generate_stream(self,
+        model_inputs: BatchEncoding,
+        streamer: TextIteratorStreamer,
+    ) -> None:
+        """생성 token을 streamer에 순차 전달"""
+        with self._generation_lock, torch.inference_mode():
+            self.model.generate(
+                **model_inputs,
+                streamer=streamer,
+                max_new_tokens=MAX_NEW_TOKENS,
+            )
+
+    def stream(self, prompt: str) -> Iterator[str]:
+        """모델이 생성하는 답변 조각을 순차 반환"""
+        model_inputs = self._prepare_inputs(prompt)
+        streamer = TextIteratorStreamer(
+            self.tokenizer,
+            skip_prompt=True,
+            skip_special_tokens=True,
+            timeout=60.0, # 생성 지연 시 60초 후 종료. 변경 가능
+        )
+
+        # 생성과 response 전송을 동시에 진행
+        generation_thread = Thread(
+            target=self._generate_stream,
+            args=(model_inputs, streamer),
+            daemon=True,
+        )
+        generation_thread.start()
+
+        yield from streamer

@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from chatbot.generator import Generator
@@ -45,6 +46,16 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
     # 동기식 모델 추론을 별도 thread에서 실행
     response = await asyncio.to_thread(generator.generate, payload.prompt)
     return ChatResponse(response=response)
+
+
+@app.post("/chat/stream", response_class=StreamingResponse)
+async def chat_stream(payload: ChatRequest, request: Request,) -> StreamingResponse:
+    """사용자 질문에 대한 답변을 조각별로 전송"""
+    generator: Generator = request.app.state.generator
+    return StreamingResponse(
+        generator.stream(payload.prompt),
+        media_type="text/plain; charset=utf-8",
+    )
 
 
 def main() -> None:
