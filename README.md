@@ -12,8 +12,8 @@ loss를 학습했다. 이 코드는
 보존한다.
 
 현재 주력 트랙은 로컬 Hugging Face instruction-tuned 모델로 생성 흐름을 먼저
-구성하는 것이다. 첫 모델은 `Qwen/Qwen3-4B-Instruct-2507`로 결정했으며, 아직
-로컬 적재와 생성은 검증하지 않았다.
+구성하는 것이다. 첫 모델은 `Qwen/Qwen3-4B-Instruct-2507`로 결정했으며, M2 Pro의
+MPS에서 모델을 적재하고 한국어 답변을 생성하는 흐름을 확인했다.
 
 ## 목표 설계 (아직 미구현)
 
@@ -87,9 +87,14 @@ korean-chatbot/
 ├── docs/
 │   ├── adr/
 │   └── devlog/
+├── src/
+│   └── chatbot/
+│       ├── __init__.py
+│       └── main.py
 ├── .python-version
 ├── pyproject.toml
 └── uv.lock
 ```
 
-주력 코드와 테스트 디렉터리는 첫 모델의 구조를 합의한 뒤 필요한 시점에 만든다.
+`main.py`에서 로컬 추론 전체 흐름을 먼저 검증했으며, 다음 단계에서 모델
+생성 책임을 `generator.py`로 분리한다.
