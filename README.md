@@ -13,7 +13,8 @@ loss를 학습했다. 이 코드는
 
 현재 주력 트랙은 로컬 Hugging Face instruction-tuned 모델로 생성 흐름을 먼저
 구성하는 것이다. 첫 모델은 `Qwen/Qwen3-4B-Instruct-2507`로 결정했으며, M2 Pro의
-MPS에서 모델을 적재하고 한국어 답변을 생성하는 흐름을 확인했다.
+MPS에서 모델을 적재하고 한국어 답변을 생성했다. FastAPI `/chat`
+endpoint로 같은 생성 기능을 호출하는 흐름도 확인했다.
 
 ## 현재 설계
 
@@ -75,6 +76,20 @@ uv run python --version
 uv run pytest --version
 ```
 
+로컬 API 서버를 실행한다.
+
+```bash
+uv run uvicorn chatbot.main:app --host 127.0.0.1 --port 8000
+```
+
+`POST /chat`에 사용자 질문을 전달한다.
+
+```json
+{
+  "prompt": "AI 서비스 개발자가 되기 위한 첫 단계는 무엇인가요?"
+}
+```
+
 실행 환경인 `.venv`는 로컬에만 두고, `pyproject.toml`과 `uv.lock`으로 의존성을
 공유한다.
 
@@ -97,5 +112,5 @@ korean-chatbot/
 └── uv.lock
 ```
 
-`generator.py`는 모델 적재와 답변 생성을 담당하고, `main.py`는 생성기를
-호출해 결과를 출력한다.
+`generator.py`는 모델 적재와 답변 생성을 담당한다. `main.py`는 FastAPI
+서버의 lifespan과 `/chat` endpoint, 로컬 실행 진입점을 담당한다.

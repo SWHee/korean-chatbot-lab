@@ -1,11 +1,54 @@
+import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from pydantic import BaseModel, Field
+
 from chatbot.generator import Generator
 
 
 PROMPT = "AI 서비스 개발자가 되기 위한 첫 단계는 무엇인가요?"
 
 
+class ChatRequest(BaseModel):
+    """챗봇에 전달할 사용자 질문 검증"""
+
+    prompt: str = Field(min_length=1)
+
+
+class ChatResponse(BaseModel):
+    """챗봇이 생성한 답변 형식 정의"""
+
+    response: str
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """서버 시작 시 모델을 한 번 적재하고 종료 시 해제"""
+    app.state.generator = Generator()
+    yield
+    del app.state.generator
+
+
+app = FastAPI(
+    title="Korean Chatbot",
+    lifespan=lifespan,
+)
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
+    """사용자 질문을 로컬 모델에 전달해 답변 반환"""
+    generator: Generator = request.app.state.generator
+
+    # 동기식 모델 추론을 별도 thread에서 실행
+    response = await asyncio.to_thread(generator.generate, payload.prompt)
+    return ChatResponse(response=response)
+
+
 def main() -> None:
-    """로컬 생성기를 실행해 답변을 출력한다."""
+    """로컬 생성기를 실행해 답변 출력"""
     generator = Generator()
     response = generator.generate(PROMPT)
     print(f"모델 답변:\n{response}")
