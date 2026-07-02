@@ -122,4 +122,4 @@ korean-chatbot/
 ```
 
 `generator.py`는 모델 적재와 답변 생성을 담당한다. `main.py`는 FastAPI
-서버의 lifespan과 `/chat` endpoint, 로컬 실행 진입점을 담당한다.
+서버의 lifespan과 `/chat`, `/chat/stream` endpoint를 담당한다.
