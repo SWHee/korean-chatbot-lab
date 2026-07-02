@@ -1,6 +1,8 @@
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from time import perf_counter
 
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
@@ -10,6 +12,7 @@ from chatbot.generator import Generator
 
 
 PROMPT = "AI 서비스 개발자가 되기 위한 첫 단계는 무엇인가요?"
+logger = logging.getLogger("uvicorn.error")
 
 
 class ChatRequest(BaseModel):
@@ -22,6 +25,7 @@ class ChatResponse(BaseModel):
     """챗봇이 생성한 답변 형식 정의"""
 
     response: str
+    generation_seconds: float
 
 
 @asynccontextmanager
@@ -44,8 +48,15 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
     generator: Generator = request.app.state.generator
 
     # 동기식 모델 추론을 별도 thread에서 실행
+    started_at = perf_counter()
     response = await asyncio.to_thread(generator.generate, payload.prompt)
-    return ChatResponse(response=response)
+    generation_seconds = perf_counter() - started_at
+    logger.info("generation_seconds=%.3f", generation_seconds)
+
+    return ChatResponse(
+        response=response,
+        generation_seconds=generation_seconds,
+    )
 
 
 @app.post("/chat/stream", response_class=StreamingResponse)
