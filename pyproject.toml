@@ -5,6 +5,7 @@ requires-python = ">=3.11,<3.14"
 dependencies = [
     "accelerate>=1.14.0",
     "fastapi[standard]>=0.138.2",
+    "httpx>=0.28.1",
     "torch>=2.12.1",
     "transformers>=5.12.1",
 ]
