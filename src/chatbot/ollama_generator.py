@@ -6,7 +6,7 @@ import httpx
 
 MODEL_ID = "qwen3:4b-instruct-2507-q4_K_M"
 BASE_URL = "http://localhost:11434"
-MAX_NEW_TOKENS = 128
+MAX_NEW_TOKENS = 1024
 TIMEOUT_SECONDS = 60.0
 
 
