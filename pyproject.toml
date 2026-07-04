@@ -21,3 +21,6 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "chatbot"
+
+[tool.fastapi]
+entrypoint = "chatbot.main:app"
