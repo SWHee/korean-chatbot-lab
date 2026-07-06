@@ -1,178 +1,60 @@
 # 첫 주력 모델로 Qwen3 4B를 선택한 이유
 
 - 작성일: 2026-06-29
-- 상태: 모델 선택 완료, 로컬 실행 전
+- 현재 상태: Hugging Face 로컬 생성과 Ollama backend 구현 완료
 
-## 시작점
+## 해결하려던 문제
 
-처음에는 한국어에 특화된 국내 모델이라는 점이 익숙하게 느껴져
-`skt/A.X-4.0-Light`를 후보로 생각했다. 이름에 Light가 포함되어 있어 내
-장비에서도 무리 없이 실행할 수 있을 것 같았지만, 실제로는 7B 모델이었다.
+M2 Pro 16GB에서 실행할 수 있고 한국어 instruction 답변을 생성하는 모델이
+필요했다. 로컬에서는 추론과 FastAPI 개발을 하고, 실제 파인튜닝이 필요해질
+경우에만 Colab Pro+ GPU를 사용할 계획이었다.
 
-이번 프로젝트에서 사용할 수 있는 환경은 M2 Pro 16GB 맥북과 Colab Pro+다.
-맥북에서는 모델 추론과 FastAPI 개발을 진행하고, 파인튜닝이 필요해지면 Colab의
-GPU를 사용할 계획이다.
+후보를 비교할 때 다음 조건을 봤다.
 
-모델을 선택할 때 다음 조건을 확인했다.
+- 한국어와 instruction-following 지원
+- M2 Pro 16GB에서의 실행 가능성
+- Hugging Face Transformers 호환성
+- chat template와 라이선스
+- 이후 RAG·파인튜닝으로 이어갈 수 있는가
 
-- 한국어와 instruction-following 성능
-- M2 Pro 16GB에서의 추론 가능성
-- Colab GPU에서의 LoRA·QLoRA 가능성
-- Hugging Face Transformers 지원
-- tokenizer와 chat template
-- 라이선스
-- 향후 LangChain과 LangGraph 연결
-- 다른 모델로 교체할 때의 영향
+## 후보와 장비 제약
 
-## A.X 4.0 Light에서 발견한 제약
+| 후보 | 규모 | 판단 |
+| --- | ---: | --- |
+| `skt/A.X-4.0-Light` | 7B | 한국어 특화지만 원본 가중치가 로컬 메모리에 부담 |
+| `Qwen/Qwen3-4B-Instruct-2507` | 4B | 원본 Transformers 흐름을 로컬에서 학습 가능한 범위 |
+| `kakaocorp/kanana-1.5-2.1b-instruct-2505` | 2.1B | 실행 여유는 크지만 첫 주력 모델로 선택할 근거가 약함 |
 
-A.X 4.0 Light는 한국어 성능, Apache 2.0 라이선스, Transformers 지원, tool
-calling 측면에서 좋은 후보였다. 한국어 챗봇이라는 프로젝트 성격만 보면 오히려
-가장 먼저 고려할 만한 모델이었다.
+가중치의 최소 메모리는 `parameter 수 × 자료형 크기`로 대략 계산할 수 있다.
+BF16·FP16은 parameter당 2바이트이므로 4B는 약 7.5GiB, 7B는 약 13GiB다.
+실제 실행에는 가중치 외에도 운영체제, PyTorch, 중간 계산과 KV cache 메모리가
+필요하다. 따라서 16GB보다 작은 모델이라고 모두 안정적으로 실행되는 것은
+아니다.
 
-문제는 로컬 실행 방식이었다. 7B 모델의 BF16 가중치만 단순 계산해도 약
-13GiB다. macOS, PyTorch, KV cache와 생성 과정에서 사용하는 메모리까지 포함하면
-16GB 통합 메모리에서 원본 모델을 안정적으로 실행하기 어렵다고 판단했다.
+## 선택과 구현
 
-4-bit로 양자화하면 실행 가능성이 높지만, 이 경우 맥북에서는 MLX나 GGUF 같은
-별도 실행 방식을 사용하고 Colab에서는 Transformers와 PyTorch를 사용하는 구조가
-될 수 있다. 첫 모델부터 두 가지 실행 방식을 관리하면 모델을 불러오고
-`generate()`를 호출하는 기본 흐름을 학습하려는 목적보다 양자화와 런타임 차이를
-처리하는 일이 먼저 커질 수 있다.
+첫 모델로 `Qwen/Qwen3-4B-Instruct-2507`을 선택했다. Apache 2.0이고,
+`AutoTokenizer`, chat template, `AutoModelForCausalLM.generate()`를 사용하는
+기본 Transformers 흐름을 직접 확인할 수 있기 때문이다.
 
-## 모델 크기와 내 장비를 연결해 판단한 방법
+현재 [`generator.py`](../../../src/chatbot/generator.py)는 다음을 수행한다.
 
-이번에 처음 알게 된 부분은 모델 카드의 parameter 수와 tensor type을 이용하면
-모델이 내 장비에 들어갈지 대략 계산할 수 있다는 점이다.
+1. tokenizer와 모델을 한 번 적재
+2. MPS에서는 FP16, 그 외에는 FP32 사용
+3. chat template 적용 후 tensor 생성
+4. 입력 token을 제외하고 새 답변만 decode
+5. 일괄 생성과 스트리밍 생성 제공
 
-모델 카드에 표시되는 `4B params`의 B는 10억 개의 parameter를 의미한다. 각
-parameter를 어떤 자료형으로 저장하는지에 따라 가중치가 차지하는 메모리가
-달라진다.
+로컬 생성은 성공했지만 FastAPI 재시작 때마다 약 7.5GiB 모델을 다시 적재하고,
+Transformers MPS 생성 속도도 느렸다. 이 문제는 모델 선택을 바꾸는 대신 같은
+모델 계열의 Ollama backend를 추가해 해결했다. Hugging Face 구현은 모델 입력
+과정을 직접 확인한 학습 결과이자 비양자화 비교 기준으로 남겨 둔다.
 
-| 자료형 | parameter당 용량 |
-| --- | ---: |
-| FP32 | 4 bytes |
-| FP16·BF16 | 2 bytes |
-| INT8 | 1 byte |
-| 4-bit | 약 0.5 byte |
+## 배운 점
 
-가중치만 고려한 최소 메모리는 다음처럼 계산할 수 있다.
-
-```text
-예상 가중치 메모리 = parameter 수 × parameter당 용량
-```
-
-Qwen3 4B의 모델 카드에는 약 4B parameter와 BF16 tensor가 표시되어 있다.
-
-```text
-4,000,000,000 × 2 bytes
-= 8,000,000,000 bytes
-≈ 7.45GiB
-```
-
-A.X 4.0 Light는 7B BF16 모델이다.
-
-```text
-7,000,000,000 × 2 bytes
-= 14,000,000,000 bytes
-≈ 13.04GiB
-```
-
-여기서 GB와 GiB의 계산 기준이 다르기 때문에 8GB가 약 7.45GiB로 표시된다. 모델
-카드의 parameter 수는 반올림된 값일 수 있으므로 실제 safetensors 파일의 전체
-크기도 함께 확인해야 한다.
-
-이 계산 결과가 장비에 필요한 전체 메모리는 아니다. 모델을 실행할 때는 가중치
-외에도 다음 공간이 필요하다.
-
-- PyTorch와 Transformers 실행 메모리
-- 입력과 중간 계산 결과
-- 생성한 token 정보를 저장하는 KV cache
-- macOS와 다른 애플리케이션이 사용하는 메모리
-- FastAPI 프로세스에서 사용하는 메모리
-
-특히 M2 맥북의 16GB는 CPU와 GPU가 공유하는 통합 메모리다. 모델이 16GB보다
-작다고 해서 전부 적재할 수 있는 것은 아니다. 가중치만으로 대부분의 메모리를
-차지한다면 실제 생성 과정에서 메모리가 부족해질 수 있다.
-
-KV cache는 입력 길이와 대화 길이가 길어질수록 커진다. 따라서 모델이 32K나
-256K context를 지원한다고 해도 내 장비에서 그 길이를 그대로 사용할 수 있다는
-의미는 아니다. 첫 로컬 실행에서는 batch size를 1로 두고 context도 4K 이하부터
-시작할 계획이다.
-
-4-bit 양자화를 적용하면 parameter당 필요한 공간을 줄일 수 있다. 단순 계산으로
-7B 모델의 가중치는 약 3.3GiB까지 줄어들 수 있지만, 실제로는 양자화 정보와 일부
-비양자화 layer 때문에 이보다 더 많은 메모리를 사용한다. 또한 실행 라이브러리와
-코드 경로가 달라질 수 있다.
-
-앞으로 모델이 내 장비에 맞는지 판단할 때는 다음 순서로 확인할 수 있다.
-
-1. 모델 카드에서 parameter 수를 확인한다.
-2. BF16, FP16, FP32 등 tensor type을 확인한다.
-3. parameter 수와 byte 수를 곱해 가중치의 최소 메모리를 계산한다.
-4. 실제 모델 파일 크기와 장비의 사용 가능한 메모리를 비교한다.
-5. context 길이와 batch size를 작게 설정해 직접 적재한다.
-6. smoke test 중 실제 메모리와 생성 시간을 확인한다.
-
-이 계산은 추론 가능성을 빠르게 판단하기 위한 1차 기준이다. 파인튜닝에서는
-gradient와 optimizer state 등 추가 메모리가 필요하므로 같은 계산만으로 판단할
-수 없다. 그래서 로컬 맥북은 추론에 사용하고, 학습은 Colab에서 LoRA 또는
-QLoRA로 진행하는 방향을 선택했다.
-
-## Qwen3 4B를 선택한 이유
-
-최종적으로 `Qwen/Qwen3-4B-Instruct-2507`을 첫 주력 모델로 선택했다.
-
-Qwen3 4B는 한국어 특화 모델은 아니지만 한국어를 공식 지원하며,
-instruction-following과 tool calling을 고려한 chat template가 제공된다. Apache
-2.0 라이선스이고 Hugging Face의 `AutoTokenizer`와 `AutoModelForCausalLM`을
-사용하는 일반적인 흐름으로 불러올 수 있다.
-
-4B BF16 가중치는 약 7.5GiB이므로 짧은 context를 사용한다면 M2 Pro 16GB에서
-원본 Transformers 모델을 실행해 볼 수 있는 범위라고 판단했다. 실제 실행 가능
-여부는 아직 확인하지 않았으므로, 다음 단계에서 직접 모델을 적재하고 메모리와
-생성 시간을 확인해야 한다.
-
-이번 선택은 Qwen3가 모든 면에서 가장 좋은 모델이라는 의미가 아니다. 현재 장비와
-학습 목적 안에서 다음 과정을 가장 단순하게 경험할 수 있는 모델을 선택한 것이다.
-
-- tokenizer 불러오기
-- chat template 적용
-- 입력을 tensor로 변환하기
-- 모델을 MPS에 적재하기
-- `generate()`로 응답 만들기
-- FastAPI에서 같은 생성 기능 호출하기
-- 나중에 LoRA 또는 QLoRA 적용하기
-
-A.X 4.0 Light는 버린 후보가 아니다. `Generator` 경계와 기본 서빙 흐름을 먼저
-만든 뒤, 한국어 품질 비교가 필요해지면 양자화 모델이나 Colab 실행 모델로 다시
-연결해 볼 수 있다.
-
-## 벤치마크와 현재 검증의 차이
-
-공개된 모델은 이미 여러 벤치마크 평가를 거쳤기 때문에 현재 단계에서 별도의
-한국어 품질 평가를 반복할 필요는 없다고 판단했다.
-
-지금 필요한 것은 모델의 성능을 다시 증명하는 평가가 아니라 로컬 환경에서의
-smoke test다.
-
-- Python 3.13 환경에서 필요한 패키지가 설치되는가
-- tokenizer와 chat template가 정상적으로 동작하는가
-- 모델이 MPS에 적재되는가
-- 한국어 한 문장을 정상적으로 생성하는가
-- 생성이 적절한 종료 토큰에서 멈추는가
-- 16GB 통합 메모리에서 실행 가능한가
-
-따라서 현재는 한국어 프롬프트 하나로 생성 흐름만 확인한다.
-
-파인튜닝 데이터셋과 목표가 정해지면 그때 별도의 평가 세트를 만든다. 동일한 평가
-세트를 기본 모델과 파인튜닝 모델에 적용해야 어떤 부분이 실제로 개선되었는지
-비교할 수 있기 때문이다.
-
-## 다음 단계
-
-다음 작업에서는 Qwen3 tokenizer부터 불러온다. 한 번에 생성 클래스 전체를 만들지
-않고 tokenizer, chat template, tensor, 모델 적재, 생성 순서로 하나씩 확인한다.
-
-로컬 생성이 성공하면 같은 기능을 `Generator` 경계로 정리하고, 이후 FastAPI에서
-호출한다.
+- 모델 이름보다 parameter 수·자료형·실행 환경을 함께 봐야 한다.
+- 모델이 지원하는 최대 context와 내 장비에서 사용할 수 있는 context는 다르다.
+- 첫 구현에서는 원본 Transformers 흐름을 익히고, 실제 개발 병목이 확인된 뒤
+  양자화 backend를 추가하는 순서가 복잡도를 줄였다.
+- 이 선택은 Qwen3가 항상 가장 좋다는 뜻이 아니라 현재 장비와 학습 목표에 맞는
+  출발점이라는 의미다.
