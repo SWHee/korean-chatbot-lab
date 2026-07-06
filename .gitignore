@@ -4,3 +4,6 @@
 /.pytest_cache/
 **/__pycache__/
 *.pyc
+
+# Derived vector index (scripts/build_index.py로 재생성)
+/data/index/
