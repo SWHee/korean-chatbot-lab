@@ -1,3 +1,5 @@
+"""Hugging Face Transformers 기반 로컬 생성기"""
+
 from collections.abc import Iterator
 from threading import Lock, Thread
 

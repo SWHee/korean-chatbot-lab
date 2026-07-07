@@ -1,3 +1,5 @@
+"""FastAPI 챗봇 API와 생성 backend 수명주기"""
+
 import asyncio
 import logging
 import os

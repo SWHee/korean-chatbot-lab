@@ -27,3 +27,6 @@ module-name = "chatbot"
 
 [tool.fastapi]
 entrypoint = "chatbot.main:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

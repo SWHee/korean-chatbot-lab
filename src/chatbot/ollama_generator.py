@@ -1,3 +1,5 @@
+"""Ollama HTTP API 기반 로컬 생성기"""
+
 import json
 from collections.abc import Iterator
 
@@ -19,7 +21,7 @@ class OllamaGenerator:
             "model": MODEL_ID,
             "messages": [{"role": "user", "content": prompt}],
             "stream": stream,
-            # HF Generator와 같은 생성 길이 상한
+            # Ollama backend의 생성 길이 상한
             "options": {"num_predict": MAX_NEW_TOKENS},
         }
 

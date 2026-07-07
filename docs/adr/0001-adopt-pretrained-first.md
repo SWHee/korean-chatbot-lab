@@ -2,7 +2,7 @@
 
 - 상태: Accepted
 - 날짜: 2026-06-30
-- 구현 상태: Not started
+- 구현 상태: Implemented
 
 ## 배경
 
