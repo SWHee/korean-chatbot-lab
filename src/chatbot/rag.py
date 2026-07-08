@@ -4,6 +4,8 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda
 
+from chatbot.retriever import retrieve_articles
+
 
 RAG_PROMPT = ChatPromptTemplate.from_messages(
     [
@@ -55,3 +57,15 @@ def answer_question(generator, question: str, articles: list[dict]) -> str:
     context = format_context(articles)
 
     return chain.invoke({"question": question, "context": context})
+
+
+def answer_with_retrieval(
+    generator,
+    encoder,
+    collection,
+    question: str,
+    top_k: int = 5,
+) -> str:
+    """검색과 답변 생성을 연결한 RAG 실행"""
+    articles = retrieve_articles(encoder, collection, question, top_k=top_k)
+    return answer_question(generator, question, articles)

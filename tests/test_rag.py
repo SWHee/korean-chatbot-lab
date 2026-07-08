@@ -121,3 +121,44 @@ def test_answer_question_invokes_chain_with_articles() -> None:
     assert answer == "예금은 관련 법령에 따라 보호됩니다."
     assert "예금은 얼마까지 보호되나요?" in generator.prompts[0]
     assert "예금자보호법 시행령 제18조" in generator.prompts[0]
+
+
+def test_answer_with_retrieval_searches_articles_then_answers(monkeypatch) -> None:
+    """질문 검색 결과로 RAG 답변 생성"""
+    generator = FakeGenerator()
+    calls = {}
+
+    def fake_retrieve_articles(encoder, collection, question, top_k):
+        calls["encoder"] = encoder
+        calls["collection"] = collection
+        calls["question"] = question
+        calls["top_k"] = top_k
+        return [
+            {
+                "law_name": "예금자보호법 시행령",
+                "article_no": "제18조",
+                "effective_date": "20250901",
+                "text": "보험금 한도는 1억원",
+            }
+        ]
+
+    monkeypatch.setattr(rag_module, "retrieve_articles", fake_retrieve_articles)
+
+    encoder = object()
+    collection = object()
+    answer = rag_module.answer_with_retrieval(
+        generator,
+        encoder,
+        collection,
+        "예금은 얼마까지 보호되나요?",
+        top_k=3,
+    )
+
+    assert answer == "예금은 관련 법령에 따라 보호됩니다."
+    assert calls == {
+        "encoder": encoder,
+        "collection": collection,
+        "question": "예금은 얼마까지 보호되나요?",
+        "top_k": 3,
+    }
+    assert "보험금 한도는 1억원" in generator.prompts[0]
