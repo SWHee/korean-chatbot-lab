@@ -47,3 +47,11 @@ def create_rag_chain(generator) -> Runnable:
     parser = OUTPUT_PARSER
 
     return prompt | model | parser
+
+
+def answer_question(generator, question: str, articles: list[dict]) -> str:
+    """검색 조문 목록 기반 RAG 답변"""
+    chain = create_rag_chain(generator)
+    context = format_context(articles)
+
+    return chain.invoke({"question": question, "context": context})

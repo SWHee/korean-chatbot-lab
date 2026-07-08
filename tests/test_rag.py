@@ -100,3 +100,24 @@ def test_rag_chain_connects_prompt_model_and_parser() -> None:
     assert answer == "예금은 관련 법령에 따라 보호됩니다."
     assert "예금은 얼마까지 보호되나요?" in generator.prompts[0]
     assert "보험금 한도는 1억원" in generator.prompts[0]
+
+
+def test_answer_question_invokes_chain_with_articles() -> None:
+    """검색 조문 목록으로 RAG 답변 생성"""
+    generator = FakeGenerator()
+    articles = [
+        {
+            "law_name": "예금자보호법 시행령",
+            "article_no": "제18조",
+            "effective_date": "20250901",
+            "text": "보험금 한도는 1억원",
+        }
+    ]
+
+    answer = rag_module.answer_question(
+        generator, "예금은 얼마까지 보호되나요?", articles
+    )
+
+    assert answer == "예금은 관련 법령에 따라 보호됩니다."
+    assert "예금은 얼마까지 보호되나요?" in generator.prompts[0]
+    assert "예금자보호법 시행령 제18조" in generator.prompts[0]
