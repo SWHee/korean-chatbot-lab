@@ -59,6 +59,15 @@ def answer_question(generator, question: str, articles: list[dict]) -> str:
     return chain.invoke({"question": question, "context": context})
 
 
+def stream_answer_question(generator, question: str, articles: list[dict]):
+    """검색 조문 목록 기반 RAG 답변 조각"""
+    context = format_context(articles)
+    prompt_value = RAG_PROMPT.invoke({"question": question, "context": context})
+    prompt_text = prompt_value.to_string()
+
+    return generator.stream(prompt_text)
+
+
 def answer_with_retrieval(
     generator,
     encoder,

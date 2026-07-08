@@ -11,7 +11,7 @@
 - `Qwen/Qwen3-4B-Instruct-2507` Hugging Face 생성기
 - `qwen3:4b-instruct-2507-q4_K_M` Ollama 생성기(기본 backend)
 - FastAPI `POST /chat`, `POST /chat/stream`
-- FastAPI `POST /ask-rag`
+- FastAPI `POST /ask-rag`, `POST /ask-rag/stream`
 - 소비자보호 법령 XML 4건 수집 및 조문 단위 파싱
 - 조문 경계 보존 청킹: 260개 조문 → 삭제 스텁 2건 제외 → 322개 청크
 - KURE-v1 임베딩과 Chroma 인덱스
@@ -31,7 +31,7 @@ OllamaGenerator       HF Generator
 
 law XML → Article → Chunk → KURE-v1 → Chroma
                                           |
-POST /ask-rag → retrieve_articles(top-k) → LCEL RAG chain
+POST /ask-rag(/stream) → retrieve_articles(top-k) → LCEL RAG chain
 ```
 
 생성 쪽은 프로젝트가 소유하는 `generate()`·`stream()` 경계에 의존한다.
@@ -69,7 +69,7 @@ Hugging Face backend를 사용하려면 환경 변수를 지정한다.
 CHATBOT_BACKEND=hf uv run uvicorn chatbot.main:app --host 127.0.0.1 --port 8000
 ```
 
-일괄 응답 요청:
+일반 생성 일괄 응답 요청:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/chat \
@@ -77,7 +77,7 @@ curl -X POST http://127.0.0.1:8000/chat \
   -d '{"prompt":"예금자보호제도가 무엇인가요?"}'
 ```
 
-스트리밍 응답 요청:
+일반 생성 스트리밍 응답 요청:
 
 ```bash
 curl -N -X POST http://127.0.0.1:8000/chat/stream \
@@ -89,7 +89,7 @@ curl -N -X POST http://127.0.0.1:8000/chat/stream \
 Swagger UI에서는 스트리밍 응답도 화면에 모아서 표시할 수 있으므로 실제 조각
 전송 확인에는 `curl -N`이 더 적합하다.
 
-법령 RAG 답변 요청:
+법령 RAG 일괄 답변 요청:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/ask-rag \
@@ -100,6 +100,29 @@ curl -X POST http://127.0.0.1:8000/ask-rag \
 `/ask-rag`는 `{"question": "질문"}` 형식의 JSON body를 사용한다. 응답에는
 생성 답변, 검색에 사용한 법령 출처, 처리 시간이 포함된다. 최초 호출 시
 KURE-v1 임베딩 모델과 Chroma 인덱스를 준비하므로 `/chat`보다 시작 비용이 크다.
+이 endpoint는 스트리밍이 아니라 답변이 끝난 뒤 JSON을 한 번에 반환한다.
+
+법령 RAG 스트리밍 답변 요청:
+
+```bash
+curl -N -X POST http://127.0.0.1:8000/ask-rag/stream \
+  -H "Content-Type: application/json" \
+  -d '{"question":"은행이 파산하면 내 예금은 얼마까지 보호받나요?"}'
+```
+
+명령어 구성:
+
+- `curl`: 터미널에서 HTTP 요청을 보내는 도구
+- `-N`: 응답 버퍼링을 끄고 서버가 보내는 조각을 바로 출력
+- `-X POST`: POST 방식으로 요청
+- `http://127.0.0.1:8000/ask-rag/stream`: 호출할 FastAPI endpoint
+- `-H "Content-Type: application/json"`: 요청 본문이 JSON임을 표시
+- `-d '{...}'`: 서버에 보낼 JSON body
+
+`/ask-rag/stream`은 `/chat/stream`처럼 순수 텍스트 조각을 이어서 보낸다.
+검색 근거는 같이 흘려보내지 않으므로 출처 확인이 필요하면 `/ask-rag`의 JSON
+응답을 사용한다. Swagger UI에서는 스트리밍 조각이 실시간으로 보이지 않을 수
+있으므로 실제 확인은 `curl -N`이나 이후 Streamlit UI에서 수행한다.
 
 ## 법령 인덱스
 

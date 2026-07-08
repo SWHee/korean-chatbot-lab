@@ -13,6 +13,11 @@ class FakeGenerator:
         self.prompts.append(prompt)
         return "예금은 관련 법령에 따라 보호됩니다."
 
+    def stream(self, prompt: str):
+        self.prompts.append(prompt)
+        yield "예금은 "
+        yield "1억원까지 보호됩니다."
+
 
 def test_format_context_includes_source_and_text() -> None:
     """검색 조문의 출처와 본문을 모델 입력 문맥으로 변환"""
@@ -162,3 +167,26 @@ def test_answer_with_retrieval_searches_articles_then_answers(monkeypatch) -> No
         "top_k": 3,
     }
     assert "보험금 한도는 1억원" in generator.prompts[0]
+
+
+def test_stream_answer_question_streams_with_articles() -> None:
+    """검색 조문 목록으로 RAG 답변 조각 생성"""
+    generator = FakeGenerator()
+    articles = [
+        {
+            "law_name": "예금자보호법 시행령",
+            "article_no": "제18조",
+            "effective_date": "20250901",
+            "text": "보험금 한도는 1억원",
+        }
+    ]
+
+    chunks = list(
+        rag_module.stream_answer_question(
+            generator, "예금은 얼마까지 보호되나요?", articles
+        )
+    )
+
+    assert chunks == ["예금은 ", "1억원까지 보호됩니다."]
+    assert "예금은 얼마까지 보호되나요?" in generator.prompts[0]
+    assert "예금자보호법 시행령 제18조" in generator.prompts[0]

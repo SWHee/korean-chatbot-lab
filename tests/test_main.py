@@ -11,6 +11,10 @@ class FakeGenerator:
     def generate(self, prompt: str) -> str:
         return "테스트 답변"
 
+    def stream(self, prompt: str):
+        yield "테스트 "
+        yield "스트림"
+
 
 def create_request() -> SimpleNamespace:
     """테스트용 Generator를 담은 요청 생성"""
@@ -106,3 +110,50 @@ def test_ask_rag_returns_answer_sources_and_generation_seconds(monkeypatch) -> N
     assert response.generation_seconds == 3.0
     assert response.sources[0].law_name == "예금자보호법 시행령"
     assert response.sources[0].article_no == "제18조"
+
+
+def test_ask_rag_stream_route_exists() -> None:
+    """Swagger에 RAG 스트리밍 endpoint 노출"""
+    assert "/ask-rag/stream" in main_module.app.openapi()["paths"]
+
+
+def test_ask_rag_stream_returns_plain_text_tokens(monkeypatch) -> None:
+    """RAG 답변 조각을 순수 텍스트로 전송"""
+    articles = [
+        {
+            "law_name": "예금자보호법 시행령",
+            "article_no": "제18조",
+            "effective_date": "20250901",
+            "similarity": 0.82,
+            "text": "보험금 한도는 1억원",
+        }
+    ]
+
+    def fake_retrieve_articles(encoder, collection, question, top_k):
+        return articles
+
+    def fake_stream_answer_question(generator, question, retrieved_articles):
+        assert question == "예금은 얼마까지 보호되나요?"
+        assert retrieved_articles == articles
+        yield "예금은 "
+        yield "1억원까지 보호됩니다."
+
+    async def collect_body():
+        response = await main_module.ask_rag_stream(
+            main_module.RagRequest(question="예금은 얼마까지 보호되나요?"),
+            create_rag_request(),
+        )
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk.decode() if isinstance(chunk, bytes) else chunk)
+        return response, "".join(chunks)
+
+    monkeypatch.setattr(main_module, "retrieve_articles", fake_retrieve_articles)
+    monkeypatch.setattr(
+        main_module, "stream_answer_question", fake_stream_answer_question
+    )
+
+    response, body = asyncio.run(collect_body())
+
+    assert response.media_type == "text/plain; charset=utf-8"
+    assert body == "예금은 1억원까지 보호됩니다."

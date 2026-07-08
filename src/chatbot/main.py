@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from chatbot.embedding import load_encoder
 from chatbot.ollama_generator import OllamaGenerator
-from chatbot.rag import answer_question
+from chatbot.rag import answer_question, stream_answer_question
 from chatbot.retriever import retrieve_articles
 from chatbot.vectorstore import open_collection
 
@@ -147,4 +147,25 @@ async def ask_rag(payload: RagRequest, request: Request) -> RagResponse:
             for article in articles
         ],
         generation_seconds=generation_seconds,
+    )
+
+
+@app.post("/ask-rag/stream", response_class=StreamingResponse)
+async def ask_rag_stream(
+    payload: RagRequest, request: Request
+) -> StreamingResponse:
+    """법령 RAG 답변 조각을 순수 텍스트로 전송"""
+    await asyncio.to_thread(prepare_rag_resources, request.app)
+
+    generator = request.app.state.generator
+    encoder = request.app.state.encoder
+    collection = request.app.state.collection
+
+    articles = await asyncio.to_thread(
+        retrieve_articles, encoder, collection, payload.question, 5
+    )
+
+    return StreamingResponse(
+        stream_answer_question(generator, payload.question, articles),
+        media_type="text/plain; charset=utf-8",
     )
