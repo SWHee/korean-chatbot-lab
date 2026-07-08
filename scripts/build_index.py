@@ -2,6 +2,7 @@
 
 사용법: uv run python scripts/build_index.py
 재실행 시 기존 컬렉션을 지우고 새로 만든다 (멱등).
+원문·파생 데이터 공개 기준은 data/laws/README.md 참고.
 """
 
 from pathlib import Path

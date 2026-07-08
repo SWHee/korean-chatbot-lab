@@ -6,22 +6,21 @@
 
 ## 현재 상태
 
-생성 모델 서빙과 RAG 인덱싱·검색 기반까지 구현했다.
+생성 모델 서빙과 법령 RAG의 기본 질의 흐름까지 구현했다.
 
 - `Qwen/Qwen3-4B-Instruct-2507` Hugging Face 생성기
 - `qwen3:4b-instruct-2507-q4_K_M` Ollama 생성기(기본 backend)
 - FastAPI `POST /chat`, `POST /chat/stream`
+- FastAPI `POST /ask-rag`
 - 소비자보호 법령 XML 4건 수집 및 조문 단위 파싱
 - 조문 경계 보존 청킹: 260개 조문 → 삭제 스텁 2건 제외 → 322개 청크
 - KURE-v1 임베딩과 Chroma 인덱스
 - 평가 질문 기반 임베딩·검색 검증
-
-아직 retrieval 결과를 생성 모델에 전달하는 RAG 체인과 `/ask` endpoint는
-구현하지 않았다. 다음 단계는 기존 경계를 유지한 최소 LangChain 연결이다.
+- LangChain LCEL 기반 최소 RAG 체인
 
 ## 현재 구조
 
-생성과 검색은 아직 독립된 흐름이다.
+일반 생성과 RAG 답변은 endpoint를 분리한다.
 
 ```text
 POST /chat, /chat/stream
@@ -32,7 +31,7 @@ OllamaGenerator       HF Generator
 
 law XML → Article → Chunk → KURE-v1 → Chroma
                                           |
-                                     search(top-k)
+POST /ask-rag → retrieve_articles(top-k) → LCEL RAG chain
 ```
 
 생성 쪽은 프로젝트가 소유하는 `generate()`·`stream()` 경계에 의존한다.
@@ -90,6 +89,18 @@ curl -N -X POST http://127.0.0.1:8000/chat/stream \
 Swagger UI에서는 스트리밍 응답도 화면에 모아서 표시할 수 있으므로 실제 조각
 전송 확인에는 `curl -N`이 더 적합하다.
 
+법령 RAG 답변 요청:
+
+```bash
+curl -X POST http://127.0.0.1:8000/ask-rag \
+  -H "Content-Type: application/json" \
+  -d '{"question":"은행이 파산하면 내 예금은 얼마까지 보호받나요?"}'
+```
+
+`/ask-rag`는 `{"question": "질문"}` 형식의 JSON body를 사용한다. 응답에는
+생성 답변, 검색에 사용한 법령 출처, 처리 시간이 포함된다. 최초 호출 시
+KURE-v1 임베딩 모델과 Chroma 인덱스를 준비하므로 `/chat`보다 시작 비용이 크다.
+
 ## 법령 인덱스
 
 원문 XML은 `data/laws/`에 포함되어 있다. 파생물인 Chroma 인덱스는 Git에
@@ -102,6 +113,9 @@ uv run python scripts/verify_index.py
 
 수집부터 다시 실행하는 방법과 snapshot 정보는
 [`data/laws/README.md`](data/laws/README.md)에 있다.
+원문 XML과 조문·청크처럼 사람이 확인 가능한 파생 데이터는 출처와 snapshot을
+명시하면 저장소에 남길 수 있다. Chroma 인덱스, 모델 weight, cache처럼 재생성
+가능한 바이너리성 파생물은 커밋하지 않는다.
 
 ## 평가
 
@@ -114,8 +128,8 @@ uv run python scripts/compare_embeddings.py
 uv run pytest
 ```
 
-최종 답변의 정확성·근거성·범위 밖 질문 처리는 RAG 체인과 `/ask`가 구현된 뒤
-LangSmith 실험으로 평가한다.
+최종 답변의 정확성·근거성·범위 밖 질문 처리는 `/ask-rag` 기준으로 LangSmith
+실험에서 평가한다.
 
 ## 주요 디렉터리
 
@@ -135,6 +149,8 @@ korean-chatbot/
 │   ├── statutes.py            # XML 조문 파싱
 │   ├── chunking.py            # 조문 청킹
 │   ├── embedding.py           # KURE-v1 임베딩
+│   ├── retriever.py           # 질문 임베딩과 조문 검색
+│   ├── rag.py                 # LCEL RAG 체인
 │   └── vectorstore.py         # Chroma 검색
 └── tests/
 ```
