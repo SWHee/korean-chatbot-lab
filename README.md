@@ -140,6 +140,15 @@ uv run python scripts/verify_index.py
 명시하면 저장소에 남길 수 있다. Chroma 인덱스, 모델 weight, cache처럼 재생성
 가능한 바이너리성 파생물은 커밋하지 않는다.
 
+RAG 파이프라인의 현재 구조는
+[`docs/others/rag-pipeline-overview.md`](docs/others/rag-pipeline-overview.md)에
+정리했다. 법령 API와 금융상품 한눈에 API처럼 외부 데이터·API를 다루는 기준은
+[`docs/others/external-data-sources.md`](docs/others/external-data-sources.md)에
+정리했다.
+LangSmith로 무엇을 추적할지는
+[`docs/others/langsmith-tracing-workflow.md`](docs/others/langsmith-tracing-workflow.md)에
+정리했다.
+
 ## 평가
 
 평가 질문은 [`docs/evaluation/rag-questions.md`](docs/evaluation/rag-questions.md)에
