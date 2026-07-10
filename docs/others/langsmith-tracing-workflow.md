@@ -24,7 +24,16 @@ LangChain 코드는 환경 변수를 설정하면 trace가 남는다.
 ```bash
 LANGSMITH_TRACING=true
 LANGSMITH_API_KEY=<발급받은 키>
-LANGSMITH_PROJECT=korean-chatbot-rag
+LANGSMITH_PROJECT=korean-chatbot-rag-dev
+```
+
+로컬에서는 `.env.example`을 복사해 `.env`를 만들고, `LANGSMITH_API_KEY` 값만
+실제 키로 바꾼다. 서버는 시작할 때 `.env`를 자동으로 읽는다.
+
+```bash
+cp .env.example .env
+# .env 안의 LANGSMITH_API_KEY 값을 실제 키로 수정
+uv run fastapi dev
 ```
 
 이 상태에서 서버를 실행하고 `/ask-rag`를 호출하면 LangSmith project에서 trace를
@@ -41,11 +50,12 @@ LANGSMITH_PROJECT=korean-chatbot-rag
 
 ## 2차 목표: retriever 단계도 따로 보기
 
-LCEL trace만으로는 검색 단계가 충분히 잘 보이지 않을 수 있다. 우리 retriever는
-직접 만든 Python 함수이고, Chroma 검색도 LangChain retriever 객체가 아니기
-때문이다.
+LCEL trace만으로는 검색 단계가 충분히 잘 보이지 않을 수 있다. 우리 retriever는 직접
+만든 Python 함수이고, Chroma 검색도 LangChain retriever 객체가 아니기 때문이다.
 
-이 경우에는 다음 단계에서 수동 trace를 얇게 추가한다.
+하지만 처음부터 수동 trace를 많이 붙이면 화면이 복잡해진다. 그래서 1차에서는
+환경 변수와 LCEL trace만 확인한다. 검색 단계가 충분히 보이지 않는다는 것을 직접
+확인한 뒤, 그때 `retrieve_articles` 주변에 얇은 수동 trace를 추가한다.
 
 ```text
 ask-rag 요청

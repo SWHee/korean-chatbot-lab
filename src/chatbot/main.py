@@ -15,6 +15,7 @@ from chatbot.embedding import load_encoder
 from chatbot.ollama_generator import OllamaGenerator
 from chatbot.rag import answer_question, stream_answer_question
 from chatbot.retriever import retrieve_articles
+from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
 
 
@@ -68,6 +69,7 @@ def prepare_rag_resources(app: FastAPI) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """서버 시작 시 선택한 backend의 생성기를 준비하고 종료 시 해제"""
+    load_local_env()
     backend = os.getenv("CHATBOT_BACKEND", "ollama")
     if backend == "ollama":
         app.state.generator = OllamaGenerator()

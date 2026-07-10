@@ -149,6 +149,9 @@ LangSmith로 무엇을 추적할지는
 [`docs/others/langsmith-tracing-workflow.md`](docs/others/langsmith-tracing-workflow.md)에
 정리했다.
 
+LangSmith를 켜려면 `.env.example`을 복사해 `.env`를 만들고
+`LANGSMITH_API_KEY`만 채운 뒤 서버를 실행한다.
+
 ## 평가
 
 평가 질문은 [`docs/evaluation/rag-questions.md`](docs/evaluation/rag-questions.md)에

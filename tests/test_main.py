@@ -35,6 +35,28 @@ def create_rag_request() -> SimpleNamespace:
     return SimpleNamespace(app=app)
 
 
+def test_lifespan_loads_local_env_before_backend_selection(monkeypatch) -> None:
+    """서버 시작 시 .env를 읽은 뒤 backend 준비"""
+    calls = []
+
+    class FakeOllamaGenerator:
+        pass
+
+    async def run_lifespan():
+        state = SimpleNamespace()
+        app = SimpleNamespace(state=state)
+        async with main_module.lifespan(app):
+            assert isinstance(app.state.generator, FakeOllamaGenerator)
+
+    monkeypatch.setenv("CHATBOT_BACKEND", "ollama")
+    monkeypatch.setattr(main_module, "load_local_env", lambda: calls.append("env"))
+    monkeypatch.setattr(main_module, "OllamaGenerator", FakeOllamaGenerator)
+
+    asyncio.run(run_lifespan())
+
+    assert calls == ["env"]
+
+
 def test_chat_returns_generation_seconds(monkeypatch) -> None:
     """응답에 답변 생성 시간 포함"""
     times = iter([10.0, 12.5])
