@@ -1,75 +1,118 @@
-# Korean Chatbot Learning Project
+# Korean Chatbot Lab
 
-한국어 챗봇을 만들며 로컬 생성 모델 서빙부터 법령 RAG와 평가까지 단계적으로
-학습하는 프로젝트다. 기능 수보다 각 단계의 입력·출력과 선택 이유를 직접
-설명할 수 있는 상태를 목표로 한다.
+로컬 LLM으로 한국어 금융 안내 챗봇을 만들며, 생성 모델 서빙부터 법령 RAG까지
+단계적으로 익히는 프로젝트입니다. 현재는 예·적금 이용자가 궁금해할
+소비자보호 제도를 법령 근거와 함께 설명하는 흐름에 집중하고 있습니다.
 
-## 현재 상태
+> 이 프로젝트의 답변은 학습·시연용입니다. 최신 법령, 개별 상품의 보호 여부,
+> 금융 의사결정은 반드시 공식 공시와 관계 기관 정보를 다시 확인해야 합니다.
 
-생성 모델 서빙과 법령 RAG의 기본 질의 흐름까지 구현했다.
+## 한눈에 보기
 
-- `Qwen/Qwen3-4B-Instruct-2507` Hugging Face 생성기
-- `qwen3:4b-instruct-2507-q4_K_M` Ollama 생성기(기본 backend)
-- FastAPI `POST /chat`, `POST /chat/stream`
-- FastAPI `POST /ask-rag`, `POST /ask-rag/stream`
-- 소비자보호 법령 XML 4건 수집 및 조문 단위 파싱
-- 조문 경계 보존 청킹: 260개 조문 → 삭제 스텁 2건 제외 → 322개 청크
-- KURE-v1 임베딩과 Chroma 인덱스
-- 평가 질문 기반 임베딩·검색 검증
-- LangChain LCEL 기반 최소 RAG 체인
+| 구분 | 현재 구현 |
+| --- | --- |
+| 생성 모델 | Qwen3-4B-Instruct-2507 · 기본 실행은 Ollama q4_K_M |
+| API | 일반 대화와 법령 RAG의 일반·스트리밍 요청 제공 |
+| RAG 데이터 | 금융소비자보호법·예금자보호법과 각 시행령, 총 4건 |
+| 검색 | KURE-v1 임베딩(1024차원) · Chroma 벡터스토어 |
+| 검증 | pytest와 임베딩·인덱스 재현 스크립트 |
 
-## 현재 구조
+## 아키텍처
 
-일반 생성과 RAG 답변은 endpoint를 분리한다.
+```mermaid
+flowchart LR
+    U[사용자 질문] --> API[FastAPI]
 
-```text
-POST /chat, /chat/stream
-          |
-      Generator interface
-       /               \
-OllamaGenerator       HF Generator
+    API --> C[/chat · /chat/stream/]
+    C --> G[Generator 경계]
+    G --> O[Ollama Qwen3<br/>기본 backend]
+    G -. 선택 .-> H[Hugging Face Qwen3]
 
-law XML → Article → Chunk → KURE-v1 → Chroma
-                                          |
-POST /ask-rag(/stream) → retrieve_articles(top-k) → LCEL RAG chain
+    API --> R[/ask-rag · /ask-rag/stream/]
+    R --> E[KURE-v1<br/>질문 임베딩]
+    E --> V[(Chroma<br/>법령 인덱스)]
+    V --> T[Retriever<br/>상위 조문 선택]
+    T --> L[LCEL RAG 체인]
+    L --> G
+
+    X[국가법령정보 Open API<br/>법령 XML 4건] --> P[파싱 · 청킹 · 임베딩]
+    P --> V
 ```
 
-생성 쪽은 프로젝트가 소유하는 `generate()`·`stream()` 경계에 의존한다.
-Ollama와 Transformers 구현을 분리해 모델 실행 방식이 FastAPI endpoint로
-퍼지지 않게 했다.
+일반 대화는 모델에 질문을 바로 전달합니다. 법령 RAG는 질문과 가까운 조문을 먼저
+찾아 모델에 함께 제공하므로, 답변과 함께 검색에 사용한 법령 출처를 확인할 수
+있습니다.
 
-RAG 쪽은 법령 수집, 파싱, 청킹, 임베딩, 벡터 검색을 작은 모듈로 분리했다.
-LangChain을 연결할 때도 이 구현을 교체하지 않고 흐름을 조합하는 데만 사용한다.
+## 현재 완료한 범위
 
-## 개발 환경
+- Qwen3 기반 로컬 생성기와 Ollama backend 전환
+- FastAPI 일반 응답·순수 텍스트 스트리밍 API
+- 법령 XML 수집, 조문 파싱, 조문 경계 기반 청킹
+- KURE-v1 모델 비교·선정과 Chroma 인덱스 생성
+- 질문 임베딩 → 조문 검색 → LCEL 답변 생성의 최소 RAG 흐름
+- 검색 결과와 기준 검색의 일치 확인, retrieval 평가 질문 관리
 
-- Python 3.13
-- uv
-- pytest
-- Ollama
+## 다음에 이어갈 범위
+
+- Streamlit 화면으로 일반 대화와 법령 RAG를 편하게 테스트
+- 금융상품 한눈에 API로 최신 예·적금 상품 후보 조회 연결
+- 법령 설명과 상품 조회를 함께 다뤄야 할 때 LangGraph 상태 흐름 검토
+
+LangGraph는 현재 RAG를 교체하는 대상이 아닙니다. 상품 API fallback, 질문 분기,
+여러 턴의 상태 관리처럼 흐름 제어가 실제로 필요해질 때 도입할 예정입니다.
+
+## 빠르게 실행하기
+
+### 1. 환경 준비
+
+Python 3.13과 [uv](https://docs.astral.sh/uv/)를 사용합니다.
 
 ```bash
-uv venv --python 3.13 --prompt ko-chat
 uv sync --locked
-source .venv/bin/activate
 ```
 
-## 챗봇 실행
-
-기본 backend는 Ollama다. 먼저 Ollama에서 모델을 준비한 뒤 API 서버를 실행한다.
+기본 backend는 Ollama입니다. Ollama를 설치한 뒤 모델을 준비합니다.
 
 ```bash
 ollama pull qwen3:4b-instruct-2507-q4_K_M
-uv run uvicorn chatbot.main:app --host 127.0.0.1 --port 8000
 ```
 
-Hugging Face backend를 사용하려면 환경 변수를 지정한다.
+### 2. 법령 인덱스 만들기
+
+저장소에는 법령 XML 원문만 포함합니다. 검색용 Chroma 인덱스는 아래 명령으로
+로컬에서 생성합니다.
 
 ```bash
-CHATBOT_BACKEND=hf uv run uvicorn chatbot.main:app --host 127.0.0.1 --port 8000
+uv run python scripts/build_index.py
 ```
 
-일반 생성 일괄 응답 요청:
+### 3. 서버 실행
+
+```bash
+uv run fastapi dev
+```
+
+서버와 Swagger UI는 각각 다음 주소에서 확인할 수 있습니다.
+
+- API: `http://127.0.0.1:8000`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+
+Hugging Face backend를 확인하고 싶다면 서버 실행 전에 환경 변수를 지정합니다.
+
+```bash
+CHATBOT_BACKEND=hf uv run fastapi dev
+```
+
+## API 사용 예시
+
+| Endpoint | 역할 | 응답 방식 |
+| --- | --- | --- |
+| `POST /chat` | RAG 없이 모델에 바로 질문 | JSON |
+| `POST /chat/stream` | 일반 답변을 텍스트 조각으로 전송 | plain text stream |
+| `POST /ask-rag` | 법령 검색 후 답변과 출처 반환 | JSON |
+| `POST /ask-rag/stream` | 법령 검색 후 답변을 텍스트 조각으로 전송 | plain text stream |
+
+일반 대화 요청:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/chat \
@@ -77,19 +120,7 @@ curl -X POST http://127.0.0.1:8000/chat \
   -d '{"prompt":"예금자보호제도가 무엇인가요?"}'
 ```
 
-일반 생성 스트리밍 응답 요청:
-
-```bash
-curl -N -X POST http://127.0.0.1:8000/chat/stream \
-  -H "Content-Type: application/json" \
-  -d '{"prompt":"예금자보호제도가 무엇인가요?"}'
-```
-
-두 endpoint 모두 `{"prompt": "질문"}` 형식의 JSON body를 사용한다.
-Swagger UI에서는 스트리밍 응답도 화면에 모아서 표시할 수 있으므로 실제 조각
-전송 확인에는 `curl -N`이 더 적합하다.
-
-법령 RAG 일괄 답변 요청:
+법령 RAG 요청:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/ask-rag \
@@ -97,99 +128,90 @@ curl -X POST http://127.0.0.1:8000/ask-rag \
   -d '{"question":"은행이 파산하면 내 예금은 얼마까지 보호받나요?"}'
 ```
 
-`/ask-rag`는 `{"question": "질문"}` 형식의 JSON body를 사용한다. 응답에는
-생성 답변, 검색에 사용한 법령 출처, 처리 시간이 포함된다. 최초 호출 시
-KURE-v1 임베딩 모델과 Chroma 인덱스를 준비하므로 `/chat`보다 시작 비용이 크다.
-이 endpoint는 스트리밍이 아니라 답변이 끝난 뒤 JSON을 한 번에 반환한다.
-
-법령 RAG 스트리밍 답변 요청:
+스트리밍은 터미널에서 `-N` 옵션으로 조각 전송을 바로 확인할 수 있습니다.
 
 ```bash
 curl -N -X POST http://127.0.0.1:8000/ask-rag/stream \
   -H "Content-Type: application/json" \
-  -d '{"question":"은행이 파산하면 내 예금은 얼마까지 보호받나요?"}'
+  -d '{"question":"예금자보호제도는 무엇인가요?"}'
 ```
 
-명령어 구성:
+`/ask-rag`는 답변, 검색 출처, 처리 시간을 JSON으로 함께 반환하므로 검증의 기준
+endpoint로 사용합니다. `/ask-rag/stream`은 사용자가 답변을 기다리는 동안 자연스럽게
+읽을 수 있도록 답변 본문만 전송합니다.
 
-- `curl`: 터미널에서 HTTP 요청을 보내는 도구
-- `-N`: 응답 버퍼링을 끄고 서버가 보내는 조각을 바로 출력
-- `-X POST`: POST 방식으로 요청
-- `http://127.0.0.1:8000/ask-rag/stream`: 호출할 FastAPI endpoint
-- `-H "Content-Type: application/json"`: 요청 본문이 JSON임을 표시
-- `-d '{...}'`: 서버에 보낼 JSON body
+## 법령 RAG 데이터 흐름
 
-`/ask-rag/stream`은 `/chat/stream`처럼 순수 텍스트 조각을 이어서 보낸다.
-검색 근거는 같이 흘려보내지 않으므로 출처 확인이 필요하면 `/ask-rag`의 JSON
-응답을 사용한다. Swagger UI에서는 스트리밍 조각이 실시간으로 보이지 않을 수
-있으므로 실제 확인은 `curl -N`이나 이후 Streamlit UI에서 수행한다.
+```text
+data/laws/*.xml
+       │  국가법령정보 Open API에서 수집한 원문 snapshot
+       ▼
+statutes.py      XML을 조문(Article) 단위로 파싱
+       ▼
+chunking.py      조문 경계를 보존하며 긴 조문만 분할
+       ▼
+embedding.py     KURE-v1으로 정규화된 1024차원 벡터 생성
+       ▼
+build_index.py   문서·메타데이터·벡터를 Chroma에 저장
+       ▼
+retriever.py     질문과 가까운 청크를 찾고 조문 단위로 중복 제거
+       ▼
+rag.py           조문 근거를 prompt에 넣어 답변 생성
+```
 
-## 법령 인덱스
+현재 인덱싱 결과는 **260개 조문에서 322개 청크**입니다. 조문이 매우 긴 경우에만
+내부를 나누고, 각 청크에는 법령명·조문번호·시행일을 함께 보관합니다. 따라서
+검색 결과를 답변의 근거로 다시 표시할 수 있습니다.
 
-원문 XML은 `data/laws/`에 포함되어 있다. 파생물인 Chroma 인덱스는 Git에
-포함하지 않고 필요할 때 재생성한다.
+원문 출처, 수집 snapshot, 재수집 방법은 [data/laws/README.md](data/laws/README.md)에서
+확인할 수 있습니다. Chroma 인덱스와 모델 cache는 재생성 가능한 로컬 산출물이므로
+Git에 올리지 않습니다.
+
+## 검증과 참고 문서
 
 ```bash
-uv run python scripts/build_index.py
+uv run pytest
 uv run python scripts/verify_index.py
 ```
 
-수집부터 다시 실행하는 방법과 snapshot 정보는
-[`data/laws/README.md`](data/laws/README.md)에 있다.
-원문 XML과 조문·청크처럼 사람이 확인 가능한 파생 데이터는 출처와 snapshot을
-명시하면 저장소에 남길 수 있다. Chroma 인덱스, 모델 weight, cache처럼 재생성
-가능한 바이너리성 파생물은 커밋하지 않는다.
+| 문서 | 내용 |
+| --- | --- |
+| [RAG 파이프라인 개요](docs/others/rag-pipeline-overview.md) | 코드 파일별 인덱싱·검색 흐름 |
+| [외부 데이터와 API](docs/others/external-data-sources.md) | 법령 원문·금융상품 한눈에 API의 역할과 저장 기준 |
+| [RAG 평가 질문](docs/evaluation/rag-questions.md) | retrieval 평가용 질문과 정답 조문 기준 |
+| [ADR](docs/adr/) | 모델·corpus·벡터스토어 선택 이유 |
 
-RAG 파이프라인의 현재 구조는
-[`docs/others/rag-pipeline-overview.md`](docs/others/rag-pipeline-overview.md)에
-정리했다. 법령 API와 금융상품 한눈에 API처럼 외부 데이터·API를 다루는 기준은
-[`docs/others/external-data-sources.md`](docs/others/external-data-sources.md)에
-정리했다.
-LangSmith로 무엇을 추적할지는
-[`docs/others/langsmith-tracing-workflow.md`](docs/others/langsmith-tracing-workflow.md)에
-정리했다.
-
-LangSmith를 켜려면 `.env.example`을 복사해 `.env`를 만들고
-`LANGSMITH_API_KEY`만 채운 뒤 서버를 실행한다.
-
-## 평가
-
-평가 질문은 [`docs/evaluation/rag-questions.md`](docs/evaluation/rag-questions.md)에
-24개가 있다. 현재 15개 질문에는 retrieval 정답 조문이 연결되어 있으며,
-임베딩 모델 비교와 Chroma 검색 검증에 사용한다.
-
-```bash
-uv run python scripts/compare_embeddings.py
-uv run pytest
-```
-
-최종 답변의 정확성·근거성·범위 밖 질문 처리는 `/ask-rag` 기준으로 LangSmith
-실험에서 평가한다.
-
-## 주요 디렉터리
+## 디렉터리 구조
 
 ```text
 korean-chatbot/
-├── data/laws/                 # 법령 XML 원문
+├── data/
+│   ├── laws/                    법령 XML 원문과 출처 정보
+│   └── index/                   로컬 Chroma 인덱스 (Git 제외)
 ├── docs/
-│   ├── adr/                   # 설계 결정
-│   ├── devlog/                # 구현 과정에서 얻은 핵심 학습
-│   ├── evaluation/            # 평가 질문
-│   └── others/                # 실행·확인 가이드
-├── scripts/                   # 수집·비교·인덱싱·검증
+│   ├── adr/                     주요 설계 결정
+│   ├── devlog/                  모델·RAG 실험에서 남긴 핵심 기록
+│   ├── evaluation/              retrieval 평가 질문과 정답 조문
+│   └── others/                  파이프라인·외부 데이터 가이드
+├── scripts/
+│   ├── collect_laws.py          법령 XML 수집
+│   ├── build_index.py           전체 법령 인덱스 재생성
+│   ├── compare_embeddings.py    임베딩 후보 비교
+│   └── verify_index.py          Chroma 검색 결과 검증
 ├── src/chatbot/
-│   ├── generator.py           # Hugging Face 생성
-│   ├── ollama_generator.py    # Ollama 생성
-│   ├── main.py                # FastAPI
-│   ├── statutes.py            # XML 조문 파싱
-│   ├── chunking.py            # 조문 청킹
-│   ├── embedding.py           # KURE-v1 임베딩
-│   ├── retriever.py           # 질문 임베딩과 조문 검색
-│   ├── rag.py                 # LCEL RAG 체인
-│   └── vectorstore.py         # Chroma 검색
-└── tests/
+│   ├── main.py                  FastAPI endpoint와 앱 수명주기
+│   ├── generator.py             Hugging Face Qwen3 생성기
+│   ├── ollama_generator.py      Ollama Qwen3 생성기
+│   ├── statutes.py              XML 조문 파싱
+│   ├── chunking.py              조문 경계 기반 청킹
+│   ├── embedding.py             KURE-v1 임베딩
+│   ├── vectorstore.py           Chroma 컬렉션 접근과 검색
+│   ├── retriever.py             질문 검색과 조문 중복 제거
+│   ├── rag.py                   LCEL RAG 답변 체인
+│   └── settings.py              로컬 환경 변수 로드
+├── tests/                       단위·흐름 검증
+└── experiments/from_scratch/    별도 보관한 Transformer 학습 실험
 ```
 
-초기에 직접 구현한 작은 Transformer는
-[`experiments/from_scratch/`](experiments/from_scratch/)에 보존하며 주력 코드와
-섞지 않는다.
+초기에 직접 구현한 Transformer 실험은 [experiments/from_scratch/](experiments/from_scratch/)에
+별도로 보관합니다. 주력 FastAPI·RAG 코드와 섞지 않습니다.
