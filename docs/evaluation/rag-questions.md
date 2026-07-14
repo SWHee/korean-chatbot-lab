@@ -45,8 +45,8 @@ LangSmith에서 실험이 바뀌어도 같은 질문의 검색 순위와 답변 
 
 | 지표 | 비교 대상 | Dataset이 제공하는 값 | 적용 범위 |
 | --- | --- | --- | --- |
-| ID 기반 Context Precision@5 | top-5 검색 조문 ↔ 관련 조문 ID | primary·supporting gold 조문 | retrieval 가능 15개 |
-| ID 기반 Context Recall@5 | top-5 검색 조문 ↔ 필수 조문 ID | primary gold 조문 | retrieval 가능 15개 |
+| ID 기반 Context Precision@5 | top-5 검색 조문 ↔ 관련 조문 ID | 필수·보조 정답 조문 | retrieval 가능 15개 |
+| ID 기반 Context Recall@5 | top-5 검색 조문 ↔ 필수 조문 ID | 필수 정답 조문 | retrieval 가능 15개 |
 | Faithfulness | 생성 답변 ↔ 실제 검색 문맥 | 생성 답변과 평가 target이 보존한 조문 본문 | retrieval 가능 15개 |
 | Answer Relevancy | 질문 ↔ 생성 답변 | `question`·생성 답변 | 전체 24개 |
 

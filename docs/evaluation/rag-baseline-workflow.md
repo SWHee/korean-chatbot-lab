@@ -38,7 +38,8 @@ LangSmith의 offline evaluation도 Dataset을 만들고, evaluator를 정한 뒤
    돌려주는 `run_rag_evaluation()`을 구현했다. LangSmith experiment 연결은 다음
    단계에서 진행한다.
 5. **작은 evaluator 구현**: `score_retrieval_at_5()`로 ID 기반 Context
-   Precision@5·Recall@5 계산을 구현했다. LangSmith evaluator 연결은 다음 단계다.
+   Precision@5·Recall@5를 계산하고, `langsmith_retrieval_evaluator`로 LangSmith
+   실행 결과와 연결했다.
 6. **기준선 experiment 실행**: 로컬 모델의 동시 실행을 피하기 위해 처음에는
    한 요청씩 실행한다.
 7. **결과 확인과 기록**: 전체 평균만 보지 않고 실패한 질문과 원인을 검색·생성으로
@@ -63,17 +64,17 @@ LangSmith의 offline evaluation도 Dataset을 만들고, evaluator를 정한 뒤
 | 기대 동작 | 근거 답변, 전제 교정, 범위 밖 안내 등 | 답변의 역할 확인 |
 | 평가 가능 여부 | retrieval 평가 대상 여부 | 현행 조문에 없는 질문의 오채점 방지 |
 
-질문은 [`rag-questions.md`](rag-questions.md)의 24개를 사용한다. 그중 gold 조문이
+질문은 [`rag-questions.md`](rag-questions.md)의 24개를 사용한다. 그중 정답 조문이
 원문에서 확인된 15개만 정답 조문 포함 여부를 계산한다. A5, B2, B3처럼 현행 조문
 문면만으로 확인하기 어려운 질문과 D·E 유형에는 같은 retrieval 점수를 억지로
 적용하지 않는다.
 
 자연어 답변은 표현이 달라질 수 있으므로 exact match를 사용하지 않는다. 대신
 `reference_answer`, `required_claims`, `forbidden_claims`를 함께 두었다. 검색은
-gold 조문 ID로 결정적으로 평가하고, 답변 내용은 실제 검색 문맥과 rubric을 받은
+정답 조문 ID로 결정적으로 평가하고, 답변 내용은 실제 검색 문맥과 rubric을 받은
 LLM-as-a-Judge로 평가한다.
 
-현재 Dataset v1은 세션⑤의 초기 gold에서 A2·A6·C2의 필수 조문을 확장했다. 법령
+현재 Dataset v1은 세션⑤의 초기 정답 조문에서 A2·A6·C2의 필수 조문을 확장했다. 법령
 근거를 더 온전하게 반영한 변경이지만 평가 기준 자체가 달라졌으므로, 세션⑤ 수치와
 Dataset v1 수치를 직접 비교하지 않는다. LangSmith experiment에는 최소한
 `dataset=rag-v1-dev`와 `corpus_snapshot=2026-07-06`을 기록한다.
@@ -82,8 +83,8 @@ Dataset v1 수치를 직접 비교하지 않는다. LangSmith experiment에는 �
 
 첫 기준선은 Judge 없이 조문 ID로 계산할 수 있는 두 지표부터 구현한다.
 
-- ID 기반 Context Recall@5 = top-5에서 찾은 primary gold 수 / 전체 primary gold 수
-- ID 기반 Context Precision@5 = top-5 중 primary 또는 supporting gold인 조문 수 /
+- ID 기반 Context Recall@5 = top-5에서 찾은 필수 정답 조문 수 / 전체 필수 정답 조문 수
+- ID 기반 Context Precision@5 = top-5 중 필수 또는 보조 정답 조문인 조문 수 /
   실제 반환된 조문 수
 
 `required_claims`는 Context Recall에 포함하지 않는다. 검색 지표는 어떤 조문을
@@ -117,7 +118,7 @@ Dataset이다. 독립적인 최종 성능으로 과장하지 않는다.
 
 기준선 평가 흐름이 동작한 뒤에는 새 질문 10~12개를 작성해 held-out test로
 분리한다. held-out test는 모델이나 검색 설정을 고를 때 사용하지 않고 마지막에만
-확인하는 새 시험 문제다. 가능하면 기존 gold에 없던 조문도 포함하고, 평가 결과가
+확인하는 새 시험 문제다. 가능하면 기존 정답 조문에 없던 조문도 포함하고, 평가 결과가
 마음에 들지 않는다는 이유로 질문이나 정답을 바꾸지 않는다.
 
 ## 다음 작업을 쉬운 말로 정리하면

@@ -1,4 +1,4 @@
-"""RAG 평가 Dataset 구조와 gold 조문 검증"""
+"""RAG 평가 Dataset 구조와 정답 조문 검증"""
 
 import json
 from pathlib import Path
@@ -45,7 +45,7 @@ def test_dataset_has_expected_ids_and_categories() -> None:
 
 
 def test_dataset_metric_contract_matches_retrieval_eligibility() -> None:
-    """gold 존재 여부와 지표 적용 범위 일치"""
+    """정답 조문 존재 여부와 지표 적용 범위 일치"""
     examples = load_examples()
     retrieval_examples = [
         example for example in examples if example["retrieval_eligible"]
@@ -60,7 +60,7 @@ def test_dataset_metric_contract_matches_retrieval_eligibility() -> None:
             if enabled
         }
         assert "answer_relevancy" in enabled_metrics
-        assert bool(example["primary_gold_articles"]) == example["retrieval_eligible"]
+        assert bool(example["required_articles"]) == example["retrieval_eligible"]
 
         if example["retrieval_eligible"]:
             assert RETRIEVAL_METRICS <= enabled_metrics
@@ -68,8 +68,8 @@ def test_dataset_metric_contract_matches_retrieval_eligibility() -> None:
             assert RETRIEVAL_METRICS.isdisjoint(enabled_metrics)
 
 
-def test_dataset_gold_articles_exist_in_law_snapshot() -> None:
-    """gold 법령명·조문번호가 XML snapshot에 존재"""
+def test_dataset_answer_articles_exist_in_law_snapshot() -> None:
+    """정답 법령명·조문번호가 XML snapshot에 존재"""
     known_articles = {
         (article.law_name, article.article_no)
         for path in LAWS_DIR.glob("*.xml")
@@ -77,13 +77,13 @@ def test_dataset_gold_articles_exist_in_law_snapshot() -> None:
     }
 
     for example in load_examples():
-        gold_articles = (
-            example["primary_gold_articles"]
-            + example["supporting_gold_articles"]
+        answer_articles = (
+            example["required_articles"]
+            + example["supporting_articles"]
         )
-        for article in gold_articles:
+        for article in answer_articles:
             key = (article["law_name"], article["article_no"])
-            assert key in known_articles, f"{example['id']} gold 조문 누락: {key}"
+            assert key in known_articles, f"{example['id']} 정답 조문 누락: {key}"
 
 
 def test_dataset_examples_have_answer_rubric() -> None:

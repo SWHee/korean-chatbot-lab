@@ -2,7 +2,7 @@
 
 사용법: uv run python scripts/compare_embeddings.py
 측정: 조문 단위 Hit@1/3/5, Recall@1/3/5, MRR + 토큰 분포 + 실행 시간
-gold는 세션⑤ 당시 버전을 보존하며 Dataset v1의 A2·A6·C2와 다름
+정답 조문은 세션⑤ 당시 버전을 보존하며 Dataset v1의 A2·A6·C2와 다름
 """
 
 import json
@@ -16,14 +16,14 @@ from chatbot.chunking import chunk_articles
 from chatbot.statutes import parse_law
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "laws"
-GOLD_VERSION = "embedding-selection-v0"
+ANSWER_ARTICLE_VERSION = "embedding-selection-v0"
 
 FSC = "금융소비자 보호에 관한 법률"
 FSCD = "금융소비자 보호에 관한 법률 시행령"
 DPA = "예금자보호법"
 DPAD = "예금자보호법 시행령"
 
-# (질문ID, 질문, gold 조문 집합)
+# (질문ID, 질문, 정답 조문 집합)
 QUESTIONS = [
     ("A1", "은행이 파산하면 내 예금은 얼마까지 보호받나요?", {(DPA, "제32조"), (DPAD, "제18조")}),
     ("A2", "보호 한도 1억원은 원금 기준인가요, 이자 포함인가요?", {(DPA, "제32조"), (DPA, "제2조")}),
@@ -59,11 +59,16 @@ def main() -> None:
     for f in sorted(DATA_DIR.glob("*.xml")):
         articles += parse_law(f)
     chunks = chunk_articles(articles)
-    gold_all = {g for _, _, gs in QUESTIONS for g in gs}
+    answer_articles_all = {
+        article for _, _, articles in QUESTIONS for article in articles
+    }
     known = {(c.law_name, c.article_no) for c in chunks}
-    assert gold_all <= known, f"gold 누락: {gold_all - known}"
+    assert answer_articles_all <= known, (
+        f"정답 조문 누락: {answer_articles_all - known}"
+    )
     print(
-        f"청크 {len(chunks)}개, 평가 질문 {len(QUESTIONS)}개, gold {GOLD_VERSION}",
+        f"청크 {len(chunks)}개, 평가 질문 {len(QUESTIONS)}개, "
+        f"정답 조문 {ANSWER_ARTICLE_VERSION}",
         flush=True,
     )
 
@@ -90,7 +95,7 @@ def main() -> None:
         keys = [(c.law_name, c.article_no) for c in chunks]
         metrics = {k: 0.0 for k in ["hit1", "hit3", "hit5", "rec1", "rec3", "rec5", "mrr"]}
         per_q = {}
-        for qi, (qid, _, gold) in enumerate(QUESTIONS):
+        for qi, (qid, _, answer_articles) in enumerate(QUESTIONS):
             best = {}  # 조문 단위 집계: 자식 청크 중 최고 점수
             for ci, key in enumerate(keys):
                 s = sims[qi, ci].item()
@@ -99,16 +104,20 @@ def main() -> None:
             ranked = sorted(best, key=best.get, reverse=True)
             for k in (1, 3, 5):
                 topk = set(ranked[:k])
-                metrics[f"hit{k}"] += bool(topk & gold)
-                metrics[f"rec{k}"] += len(topk & gold) / len(gold)
-            first = next(i for i, key in enumerate(ranked) if key in gold)
+                metrics[f"hit{k}"] += bool(topk & answer_articles)
+                metrics[f"rec{k}"] += (
+                    len(topk & answer_articles) / len(answer_articles)
+                )
+            first = next(
+                i for i, key in enumerate(ranked) if key in answer_articles
+            )
             metrics["mrr"] += 1 / (first + 1)
             per_q[qid] = first + 1
         nq = len(QUESTIONS)
         results[model_name] = {
             "metrics": {k: round(v / nq, 3) for k, v in metrics.items()},
             "tokens": tstat, "index_s": round(index_s, 1),
-            "first_gold_rank": per_q,
+            "first_answer_article_rank": per_q,
         }
         print(model_name, json.dumps(results[model_name], ensure_ascii=False), flush=True)
         del model, doc_emb, q_emb, sims

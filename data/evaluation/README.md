@@ -21,20 +21,21 @@ RAG가 기존 Chroma 인덱스에서 어떤 조문을 찾고 어떤 답변을 �
 평가 질문 1개
   → Chroma에서 법령 조문 검색
   → 검색된 조문을 근거로 답변 생성
-  → gold 조문·답변 조건과 비교해 점수 계산
+  → 정답 조문·답변 조건과 비교해 점수 계산
 ```
 
 ## 데이터 출처
 
 - 질문: `docs/evaluation/rag-questions.md`에서 정리한 24개 질문
 - 법령 근거: `data/laws/`의 2026-07-06 국가법령정보 Open API snapshot
-- gold 조문과 기대 주장: 법령 XML 원문 대조 후 작성
+- 정답 조문과 기대 주장: 법령 XML 원문 대조 후 작성
 
 이 질문 중 15개는 임베딩 모델 선정과 검색 검증에 이미 사용했다. 따라서 이 파일은
 LangGraph 전후의 회귀를 확인하는 `dev` split이며, 독립적인 최종 성능을 주장하는
 test split이 아니다. held-out test는 현재 기준선을 만든 뒤 별도 버전으로 추가한다.
 
-파일명의 `v1`은 현재 gold 기준의 버전이다. 세션⑤ 임베딩 비교 때 사용한 초기 gold보다
+파일명의 `v1`은 현재 정답 조문 기준의 버전이다. 세션⑤ 임베딩 비교 때 사용한 초기
+정답 조문보다
 A2·A6·C2의 필수 조문을 확장했으므로, 두 실험의 수치를 직접 비교하지 않는다. 이후
 LangSmith experiment에는 Dataset 파일명과 `corpus_snapshot`을 함께 기록한다.
 
@@ -43,8 +44,8 @@ LangSmith experiment에는 Dataset 파일명과 `corpus_snapshot`을 함께 기�
 | 필드 | 의미 |
 | --- | --- |
 | `id` | A1처럼 유형 문자와 순번을 합친 질문 ID |
-| `primary_gold_articles` | 질문에 답하는 데 꼭 필요한 조문 |
-| `supporting_gold_articles` | 함께 검색되면 도움이 되는 보조 조문 |
+| `required_articles` | 질문에 답하는 데 꼭 필요한 필수 정답 조문 |
+| `supporting_articles` | 함께 검색되면 관련 있다고 인정할 보조 정답 조문 |
 | `reference_answer` | 정답 문장 복사본이 아니라 기대 답변의 기준 |
 | `required_claims` | 답변에 포함해야 하는 핵심 주장 |
 | `forbidden_claims` | 오래된 정보, 과장, 근거 없는 단정처럼 피해야 하는 주장 |
@@ -60,7 +61,7 @@ JSON 객체여야 한다. JSON 문법은 `//`나 `#` 주석을 허용하지 않�
 | --- | --- | --- |
 | `id`·`question` | 문자열 | `"A1"`, `"은행이 파산하면..."` |
 | `retrieval_eligible` | 참·거짓 | `true` |
-| `primary_gold_articles` | 객체 목록 | 법령명과 조문번호 목록 |
+| `required_articles` | 객체 목록 | 법령명과 조문번호 목록 |
 | `required_claims` | 문자열 목록 | 답변에 필요한 핵심 내용 목록 |
 | `metric_eligibility` | 참·거짓 값을 가진 객체 | 지표별 적용 여부 |
 
@@ -69,8 +70,8 @@ JSON 객체여야 한다. JSON 문법은 `//`나 `#` 주석을 허용하지 않�
 
 첫 기준선의 검색 지표는 조문 ID로 결정적으로 계산한다.
 
-- ID 기반 Context Recall@5: top-5에서 찾은 primary gold 수 / 전체 primary gold 수
-- ID 기반 Context Precision@5: top-5 중 primary 또는 supporting gold인 조문 수 /
+- ID 기반 Context Recall@5: top-5에서 찾은 필수 정답 조문 수 / 전체 필수 정답 조문 수
+- ID 기반 Context Precision@5: top-5 중 필수 또는 보조 정답 조문인 조문 수 /
   실제 반환된 조문 수
 
 `required_claims`는 Context Recall 계산에 섞지 않고, 생성 답변이 꼭 말해야 할 내용을
