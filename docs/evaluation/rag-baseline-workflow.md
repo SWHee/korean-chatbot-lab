@@ -35,7 +35,8 @@ LangSmith의 offline evaluation도 Dataset을 만들고, evaluator를 정한 뒤
 3. **LangSmith Dataset 등록**: 검증된 JSONL 질문과 정답 조건을 LangSmith에
    올린다.
 4. **평가 대상 연결**: 질문 하나로 현재 RAG를 실행해 답변·검색 출처·조문 본문을
-   돌려주는 평가용 함수(`target`)를 만든다.
+   돌려주는 `run_rag_evaluation()`을 구현했다. LangSmith experiment 연결은 다음
+   단계에서 진행한다.
 5. **작은 evaluator 구현**: ID 기반 Context Precision@5·Recall@5처럼 코드로
    확인할 수 있는 항목부터 시작한다.
 6. **기준선 experiment 실행**: 로컬 모델의 동시 실행을 피하기 위해 처음에는
