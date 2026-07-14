@@ -54,6 +54,27 @@ LangChain은 지금 단계에서 전체 구조를 대체하지 않는다. 기존
 retriever, generator 경계를 유지하고, `rag.py`에서 prompt → model → parser 흐름을
 작게 연결하는 데 사용한다.
 
+### 왜 `StrOutputParser`를 쓰나
+
+현재 RAG가 모델에서 받아야 하는 값은 사용자에게 보여 줄 한국어 답변 문자열이다.
+그래서 LCEL 체인의 마지막에는 `StrOutputParser`를 둔다.
+
+```text
+ChatPromptTemplate → Generator를 감싼 RunnableLambda → StrOutputParser
+```
+
+지금의 `RunnableLambda`도 이미 문자열을 반환하므로 parser가 답변 형식을 크게
+바꾸지는 않는다. 다만 prompt, model, parser의 역할을 코드와 LangSmith trace에서
+구분할 수 있고, 나중에 후처리가 필요하면 마지막 단계만 바꿀 수 있다.
+
+`with_structured_output()`은 정해진 항목으로 모델의 출력을 받아야 할 때 유용하다.
+하지만 현재 Generator는 이 기능을 제공하는 LangChain ChatModel이 아니고, 최종
+답변도 JSON보다 자연어가 알맞다. 출처와 응답 시간은 모델이 추측하게 하지 않고
+FastAPI가 검색 결과와 측정값으로 직접 구성한다.
+
+이후 LangGraph에서 질문 유형, 다음 경로, tool 호출 인자처럼 내부 판단을 정해진
+형태로 받아야 할 때는 Pydantic 기반 structured output을 다시 검토한다.
+
 ## 보조 스크립트
 
 | 파일 | 역할 |

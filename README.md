@@ -179,6 +179,7 @@ uv run python scripts/verify_index.py
 | [RAG 파이프라인 개요](docs/others/rag-pipeline-overview.md) | 코드 파일별 인덱싱·검색 흐름 |
 | [외부 데이터와 API](docs/others/external-data-sources.md) | 법령 원문·금융상품 한눈에 API의 역할과 저장 기준 |
 | [RAG 평가 질문](docs/evaluation/rag-questions.md) | retrieval 평가용 질문과 정답 조문 기준 |
+| [RAG 기준선 평가 순서](docs/evaluation/rag-baseline-workflow.md) | LangGraph 전후를 같은 Dataset으로 비교하는 순서 |
 | [ADR](docs/adr/) | 모델·corpus·벡터스토어 선택 이유 |
 
 ## 디렉터리 구조
@@ -187,6 +188,7 @@ uv run python scripts/verify_index.py
 korean-chatbot/
 ├── data/
 │   ├── laws/                    법령 XML 원문과 출처 정보
+│   ├── evaluation/              RAG 개발·회귀 평가 Dataset
 │   └── index/                   로컬 Chroma 인덱스 (Git 제외)
 ├── docs/
 │   ├── adr/                     주요 설계 결정
