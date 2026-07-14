@@ -13,20 +13,20 @@ def run_rag_evaluation(
     top_k: int = DEFAULT_TOP_K,
 ) -> dict[str, object]:
     """질문 하나의 RAG 답변·출처·검색 문맥 반환"""
-    question = inputs["question"]
-    articles = retrieve_articles(
+    question = inputs["question"]   # 입력 단계
+    articles = retrieve_articles(   # 검색 단계
         encoder=encoder,
         collection=collection,
         question=question,
         top_k=top_k,
     )
-    answer = answer_question(
+    answer = answer_question(   # 생성 단계
         generator=generator,
         question=question,
         articles=articles,
     )
 
-    sources = [
+    sources = [     # 메타데이터 정형화 단계
         {
             "law_name": article["law_name"],
             "article_no": article["article_no"],
@@ -35,7 +35,7 @@ def run_rag_evaluation(
         }
         for article in articles
     ]
-    retrieved_contexts = [format_context([article]) for article in articles]
+    retrieved_contexts = [format_context([article]) for article in articles]    # 텍스트 형태로 포매팅 단계
 
     return {
         "answer": answer,

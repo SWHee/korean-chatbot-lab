@@ -37,8 +37,8 @@ LangSmith의 offline evaluation도 Dataset을 만들고, evaluator를 정한 뒤
 4. **평가 대상 연결**: 질문 하나로 현재 RAG를 실행해 답변·검색 출처·조문 본문을
    돌려주는 `run_rag_evaluation()`을 구현했다. LangSmith experiment 연결은 다음
    단계에서 진행한다.
-5. **작은 evaluator 구현**: ID 기반 Context Precision@5·Recall@5처럼 코드로
-   확인할 수 있는 항목부터 시작한다.
+5. **작은 evaluator 구현**: `score_retrieval_at_5()`로 ID 기반 Context
+   Precision@5·Recall@5 계산을 구현했다. LangSmith evaluator 연결은 다음 단계다.
 6. **기준선 experiment 실행**: 로컬 모델의 동시 실행을 피하기 위해 처음에는
    한 요청씩 실행한다.
 7. **결과 확인과 기록**: 전체 평균만 보지 않고 실패한 질문과 원인을 검색·생성으로
