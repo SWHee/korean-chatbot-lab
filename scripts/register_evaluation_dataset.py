@@ -6,12 +6,12 @@ from uuid import NAMESPACE_URL, uuid5
 
 from langsmith import Client
 
+from chatbot.evaluation import DATASET_NAME, DATASET_VERSION
 from chatbot.settings import load_local_env
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATASET_PATH = PROJECT_ROOT / "data" / "evaluation" / "rag-v1-dev.jsonl"
-DATASET_NAME = "korean-chatbot-rag-v1-dev"
 DATASET_DESCRIPTION = "법령 RAG의 LangChain·LangGraph 전후 비교용 개발 Dataset"
 
 
@@ -39,7 +39,7 @@ def build_langsmith_example(row: dict) -> dict:
         "metadata": {
             "question_id": row["id"],
             "category": row["category"],
-            "dataset_version": "rag-v1-dev",
+            "dataset_version": DATASET_VERSION,
         },
         "split": row["split"],
     }
@@ -53,7 +53,7 @@ def register_dataset(client: Client, rows: list[dict]):
         dataset = client.create_dataset(
             DATASET_NAME,
             description=DATASET_DESCRIPTION,
-            metadata={"dataset_version": "rag-v1-dev"},
+            metadata={"dataset_version": DATASET_VERSION},
         )
 
     examples = [build_langsmith_example(row) for row in rows]

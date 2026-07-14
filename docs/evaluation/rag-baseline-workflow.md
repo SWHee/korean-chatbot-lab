@@ -35,13 +35,13 @@ LangSmith의 offline evaluation도 Dataset을 만들고, evaluator를 정한 뒤
 3. **LangSmith Dataset 등록**: 검증된 JSONL 질문과 정답 조건을 LangSmith에
    `korean-chatbot-rag-v1-dev` Dataset으로 등록했다. (완료)
 4. **평가 대상 연결**: 질문 하나로 현재 RAG를 실행해 답변·검색 출처·조문 본문을
-   돌려주는 `run_rag_evaluation()`을 구현했다. LangSmith experiment 연결은 다음
-   단계에서 진행한다.
+   돌려주는 `run_rag_evaluation()`을 LangSmith experiment에 연결했다. (완료)
 5. **작은 evaluator 구현**: `score_retrieval_at_5()`로 ID 기반 Context
    Precision@5·Recall@5를 계산하고, `langsmith_retrieval_evaluator`로 LangSmith
    실행 결과와 연결했다.
 6. **기준선 experiment 실행**: 로컬 모델의 동시 실행을 피하기 위해 처음에는
-   한 요청씩 실행한다.
+   한 요청씩 실행한다. A1 한 문항으로 연결을 확인했고, 전체 실행은 다음 단계에서
+   진행한다.
 7. **결과 확인과 기록**: 전체 평균만 보지 않고 실패한 질문과 원인을 검색·생성으로
    나누어 확인한다.
 8. **StateGraph 마이그레이션**: 검색과 답변 생성 기능은 유지하고 실행 구조만
@@ -133,9 +133,13 @@ RAG에 넣어 아래 결과를 한 묶음으로 받는 함수까지 만든 상�
   → 생성된 답변
 ```
 
-이제 이 함수를 LangSmith experiment에서 먼저 한 문항으로 실행한다. 정상 동작을
-확인한 뒤 24문항으로 넓혀 "정답 조문을 찾았는가", "찾은 조문만 사용해 답했는가",
+이 함수를 LangSmith experiment에서 A1 한 문항으로 실행해 연결을 확인했다. 다음에는
+24문항으로 넓혀 "정답 조문을 찾았는가", "찾은 조문만 사용해 답했는가",
 "질문에 맞게 답했는가"를 같은 조건으로 확인한다.
+
+```bash
+uv run python scripts/run_rag_evaluation.py --question-id A1
+```
 
 ## 이 단계의 완료 기준
 

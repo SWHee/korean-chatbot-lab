@@ -4,6 +4,11 @@ from chatbot.rag import answer_question, format_context
 from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
 
 
+DATASET_NAME = "korean-chatbot-rag-v1-dev"
+DATASET_VERSION = "rag-v1-dev"
+CORPUS_SNAPSHOT = "2026-07-06"
+
+
 def run_rag_evaluation(
     inputs: dict[str, str],
     *,
