@@ -96,3 +96,5 @@ def test_dataset_examples_have_answer_rubric() -> None:
         assert example["forbidden_claims"]
         assert example["expected_behavior"].strip()
         assert example["corpus_snapshot"] == "2026-07-06"
+        if "evaluation_note" in example:
+            assert example["evaluation_note"].strip()

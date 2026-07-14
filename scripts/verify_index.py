@@ -5,7 +5,7 @@
 """
 
 import torch
-from compare_embeddings import QUESTIONS
+from compare_embeddings import GOLD_VERSION, QUESTIONS
 
 from chatbot.embedding import load_encoder
 from chatbot.vectorstore import open_collection, search
@@ -17,6 +17,7 @@ def article_top5(scores: dict) -> list:
 
 
 def main() -> None:
+    print("gold 버전:", GOLD_VERSION)
     collection = open_collection()
     print("컬렉션 청크 수:", collection.count())
 

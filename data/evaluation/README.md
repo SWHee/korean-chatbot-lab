@@ -34,6 +34,10 @@ RAG가 기존 Chroma 인덱스에서 어떤 조문을 찾고 어떤 답변을 �
 LangGraph 전후의 회귀를 확인하는 `dev` split이며, 독립적인 최종 성능을 주장하는
 test split이 아니다. held-out test는 현재 기준선을 만든 뒤 별도 버전으로 추가한다.
 
+파일명의 `v1`은 현재 gold 기준의 버전이다. 세션⑤ 임베딩 비교 때 사용한 초기 gold보다
+A2·A6·C2의 필수 조문을 확장했으므로, 두 실험의 수치를 직접 비교하지 않는다. 이후
+LangSmith experiment에는 Dataset 파일명과 `corpus_snapshot`을 함께 기록한다.
+
 ## 주요 필드
 
 | 필드 | 의미 |
@@ -45,9 +49,12 @@ test split이 아니다. held-out test는 현재 기준선을 만든 뒤 별도 
 | `required_claims` | 답변에 포함해야 하는 핵심 주장 |
 | `forbidden_claims` | 오래된 정보, 과장, 근거 없는 단정처럼 피해야 하는 주장 |
 | `metric_eligibility` | 질문별로 적용할 수 있는 RAG 평가 지표 |
+| `evaluation_note` | 일부 어려운 문항에만 두는 해석 주의사항 |
 
-JSONL은 한 줄에 질문 하나를 저장한다. 각 줄은 JSON 객체이며 문자열, 참·거짓,
-목록, 객체를 함께 사용한다.
+JSONL의 마지막 `L`은 Lines를 뜻한다. 한 줄에 질문 하나를 저장하며, 각 줄은 완전한
+JSON 객체여야 한다. JSON 문법은 `//`나 `#` 주석을 허용하지 않으므로 주석을 넣으면
+파일을 읽을 수 없게 된다. 설명이 필요한 문항은 `evaluation_note` 같은 실제 필드나
+이 README를 사용한다.
 
 | 필드 | 데이터 유형 | 예시 |
 | --- | --- | --- |
@@ -60,13 +67,24 @@ JSONL은 한 줄에 질문 하나를 저장한다. 각 줄은 JSON 객체이며 
 `id`는 파일의 줄 번호가 아니라 질문의 고정 이름이다. 질문 순서가 바뀌어도 A1이라는
 이름을 유지하므로, 여러 실험에서 같은 질문의 결과를 비교할 수 있다.
 
-Context Recall은 `primary_gold_articles`와 `required_claims`를 기준으로 필수 근거를
-놓쳤는지 확인한다. Context Precision은 primary와 supporting 조문을 모두 관련
-문맥으로 인정해 검색 순위를 평가한다.
+첫 기준선의 검색 지표는 조문 ID로 결정적으로 계산한다.
+
+- ID 기반 Context Recall@5: top-5에서 찾은 primary gold 수 / 전체 primary gold 수
+- ID 기반 Context Precision@5: top-5 중 primary 또는 supporting gold인 조문 수 /
+  실제 반환된 조문 수
+
+`required_claims`는 Context Recall 계산에 섞지 않고, 생성 답변이 꼭 말해야 할 내용을
+검사하는 데 사용한다. 이렇게 검색 조문 평가와 자연어 답변 평가를 분리하면 같은 결과를
+다시 재현하기 쉽다.
 
 A5, B2, B3처럼 현행 조문 인덱스만으로 직접 답하기 어려운 질문에는 검색 점수를
 억지로 계산하지 않는다. D·E 유형도 검색 정답보다 범위 안내가 중요한 질문이라
 Answer Relevancy와 별도 행동 rubric으로 평가한다.
+
+C 유형의 잘못된 전제 질문과 검색 평가에서 제외한 9문항은 일부러 실패하기 쉬운
+상황을 넣은 것이다. 이 문항들은 `expected_behavior`와 `forbidden_claims`가 주석
+역할을 겸한다. 향후 Judge는 금지 주장을 실제로 말했는지 별도 결과로 반환하고,
+첫 기준선에서는 9문항을 사람이 직접 확인한다.
 
 ## 다음 평가 단계에서 필요한 출력
 

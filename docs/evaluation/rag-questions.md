@@ -45,16 +45,17 @@ LangSmith에서 실험이 바뀌어도 같은 질문의 검색 순위와 답변 
 
 | 지표 | 비교 대상 | Dataset이 제공하는 값 | 적용 범위 |
 | --- | --- | --- | --- |
-| Context Precision | 질문 ↔ 검색된 조문의 순위 | primary·supporting gold 조문 | retrieval 가능 15개 |
-| Context Recall | reference의 핵심 주장 ↔ 검색 문맥 | primary gold·`required_claims` | retrieval 가능 15개 |
+| ID 기반 Context Precision@5 | top-5 검색 조문 ↔ 관련 조문 ID | primary·supporting gold 조문 | retrieval 가능 15개 |
+| ID 기반 Context Recall@5 | top-5 검색 조문 ↔ 필수 조문 ID | primary gold 조문 | retrieval 가능 15개 |
 | Faithfulness | 생성 답변 ↔ 실제 검색 문맥 | 생성 답변과 평가 target이 보존한 조문 본문 | retrieval 가능 15개 |
 | Answer Relevancy | 질문 ↔ 생성 답변 | `question`·생성 답변 | 전체 24개 |
 
-Context Precision과 Recall은 비슷해 보여도 보는 실패가 다르다. Precision은 불필요한
-조문이 정답보다 앞에 오는지 보고, Recall은 답변에 필요한 근거를 빠뜨렸는지 본다.
+Context Precision과 Recall은 비슷해 보여도 보는 실패가 다르다. Precision은 top-5에
+불필요한 조문이 얼마나 섞였는지 보고, Recall은 필수 조문을 빠뜨렸는지 본다.
 Faithfulness는 검색이 잘됐는지와 별개로 모델이 근거 밖 주장을 만들었는지 확인한다.
 Answer Relevancy는 답변이 질문을 직접 다뤘는지 보며, 사실이 맞는지는 이 점수만으로
-판정하지 않는다.
+판정하지 않는다. `required_claims`와 `forbidden_claims`는 검색 점수가 아니라 생성
+답변을 검사하는 기준으로 사용한다.
 
 현재 Dataset은 이 지표들을 계산할 입력을 갖추었지만 아직 점수를 실행한 상태는
 아니다. 다음 단계에서 실제 `/ask-rag`와 같은 검색·생성 경로의 출력과 연결한다.

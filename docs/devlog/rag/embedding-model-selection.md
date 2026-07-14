@@ -33,6 +33,9 @@ retrieval 평가에서 제외했다.
 재현 코드는 [`compare_embeddings.py`](../../../scripts/compare_embeddings.py)에
 있다.
 
+이 결과는 세션⑤ 당시의 초기 gold를 사용한다. 이후 만든 Dataset v1은 A2·A6·C2의
+필수 조문을 확장했으므로, Dataset v1으로 계산한 수치와 직접 비교하지 않는다.
+
 ## 결과
 
 | 모델 | Hit@1 | Hit@5 | Recall@5 | MRR | 인덱싱 시간 |

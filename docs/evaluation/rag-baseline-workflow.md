@@ -36,7 +36,7 @@ LangSmith의 offline evaluation도 Dataset을 만들고, evaluator를 정한 뒤
    올린다.
 4. **평가 대상 연결**: 질문 하나로 현재 RAG를 실행해 답변·검색 출처·조문 본문을
    돌려주는 평가용 함수(`target`)를 만든다.
-5. **작은 evaluator 구현**: 정답 조문 포함 여부, 답변 존재 여부처럼 코드로
+5. **작은 evaluator 구현**: ID 기반 Context Precision@5·Recall@5처럼 코드로
    확인할 수 있는 항목부터 시작한다.
 6. **기준선 experiment 실행**: 로컬 모델의 동시 실행을 피하기 위해 처음에는
    한 요청씩 실행한다.
@@ -72,23 +72,40 @@ LangSmith의 offline evaluation도 Dataset을 만들고, evaluator를 정한 뒤
 gold 조문 ID로 결정적으로 평가하고, 답변 내용은 실제 검색 문맥과 rubric을 받은
 LLM-as-a-Judge로 평가한다.
 
-## Gemini judge의 역할
+현재 Dataset v1은 세션⑤의 초기 gold에서 A2·A6·C2의 필수 조문을 확장했다. 법령
+근거를 더 온전하게 반영한 변경이지만 평가 기준 자체가 달라졌으므로, 세션⑤ 수치와
+Dataset v1 수치를 직접 비교하지 않는다. LangSmith experiment에는 최소한
+`dataset=rag-v1-dev`와 `corpus_snapshot=2026-07-06`을 기록한다.
 
-`gemini-2.5-flash`는 structured output을 지원하고 무료 tier가 제공되므로 첫
-LLM-as-a-Judge 실습 후보로 사용할 수 있다. 다만 Gemini가 법률 정답을 새로 만드는
-것은 아니다. 질문, reference, 실제 검색 문맥, 생성 답변을 함께 주고 다음을
-판정하게 한다.
+## 검색 지표의 계산 기준
+
+첫 기준선은 Judge 없이 조문 ID로 계산할 수 있는 두 지표부터 구현한다.
+
+- ID 기반 Context Recall@5 = top-5에서 찾은 primary gold 수 / 전체 primary gold 수
+- ID 기반 Context Precision@5 = top-5 중 primary 또는 supporting gold인 조문 수 /
+  실제 반환된 조문 수
+
+`required_claims`는 Context Recall에 포함하지 않는다. 검색 지표는 어떤 조문을
+찾았는지 평가하고, 필수·금지 주장은 생성 답변 평가에서 별도로 확인한다.
+
+## LLM Judge는 아직 미선정
+
+OpenAI·Claude·Gemini 계열을 후보로 두고, 같은 답변 일부를 채점한 결과가 사용자
+판단과 얼마나 일치하는지 비교한 뒤 선택한다. 특정 모델이나 API key가 준비됐다고
+가정하지 않는다. 선택된 Judge는 법률 정답을 새로 만드는 역할이 아니라 질문,
+reference, 실제 검색 문맥, 생성 답변을 함께 받아 다음을 판정한다.
 
 - 답변의 주장이 검색 문맥에서 확인되는가(Faithfulness)
 - 질문을 직접 다루며 불필요하게 벗어나지 않는가(Answer Relevancy)
-- `required_claims`를 충족하고 `forbidden_claims`를 말하지 않는가
+- 어떤 `required_claims`를 충족했는가
+- 어떤 `forbidden_claims`를 위반했는가
 
-Context Precision과 Context Recall은 먼저 사람이 확인한 법령명·조문번호를 이용한
-코드 evaluator로 계산한다. 고정 ID가 있는데도 judge 모델에 검색 정답을 다시
-추측하게 하면 비용이 들고 결과도 흔들릴 수 있기 때문이다.
+Judge 출력에는 점수만 두지 않고 충족한 필수 주장과 위반한 금지 주장의 목록을
+분리한다. 특히 Faithfulness를 적용하지 않는 A5·B2·B3·D·E의 9문항은 금지 주장
+위반을 별도로 확인해야 근거 없는 답변을 놓치지 않는다.
 
 첫 experiment에서는 judge 점수를 그대로 믿지 않고 24개 결과를 모두 직접 확인한다.
-사람 판단과 Gemini 점수가 다르면 Dataset rubric 또는 judge prompt 중 어느 쪽이
+사람 판단과 Judge 점수가 다르면 Dataset rubric 또는 judge prompt 중 어느 쪽이
 불명확한지 먼저 살펴본다.
 
 ## dev와 held-out 구분
@@ -133,5 +150,3 @@ Dataset이다. 독립적인 최종 성능으로 과장하지 않는다.
 - [Ragas Context Recall](https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/context_recall/)
 - [Ragas Faithfulness](https://docs.ragas.io/en/latest/concepts/metrics/available_metrics/faithfulness/)
 - [Ragas Answer Relevancy](https://docs.ragas.io/en/latest/concepts/metrics/available_metrics/answer_relevance/)
-- [Gemini 2.5 Flash](https://ai.google.dev/gemini-api/docs/models/gemini-2.5-flash)
-- [Gemini API 가격과 free tier](https://ai.google.dev/gemini-api/docs/pricing)

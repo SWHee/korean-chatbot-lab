@@ -2,7 +2,7 @@
 
 사용법: uv run python scripts/compare_embeddings.py
 측정: 조문 단위 Hit@1/3/5, Recall@1/3/5, MRR + 토큰 분포 + 실행 시간
-gold 라벨은 2026-07-06 법령 원문 대조로 확정 (docs/evaluation/rag-questions.md)
+gold는 세션⑤ 당시 버전을 보존하며 Dataset v1의 A2·A6·C2와 다름
 """
 
 import json
@@ -16,6 +16,7 @@ from chatbot.chunking import chunk_articles
 from chatbot.statutes import parse_law
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "laws"
+GOLD_VERSION = "embedding-selection-v0"
 
 FSC = "금융소비자 보호에 관한 법률"
 FSCD = "금융소비자 보호에 관한 법률 시행령"
@@ -61,7 +62,10 @@ def main() -> None:
     gold_all = {g for _, _, gs in QUESTIONS for g in gs}
     known = {(c.law_name, c.article_no) for c in chunks}
     assert gold_all <= known, f"gold 누락: {gold_all - known}"
-    print(f"청크 {len(chunks)}개, 평가 질문 {len(QUESTIONS)}개", flush=True)
+    print(
+        f"청크 {len(chunks)}개, 평가 질문 {len(QUESTIONS)}개, gold {GOLD_VERSION}",
+        flush=True,
+    )
 
     results = {}
     for model_name, style in MODELS:
