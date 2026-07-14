@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from chatbot.embedding import load_encoder
 from chatbot.ollama_generator import OllamaGenerator
 from chatbot.rag import answer_question, stream_answer_question
-from chatbot.retriever import retrieve_articles
+from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
 
@@ -64,6 +64,17 @@ def prepare_rag_resources(app: FastAPI) -> None:
         app.state.encoder = load_encoder()
     if not hasattr(app.state, "collection"):
         app.state.collection = open_collection()
+
+
+async def retrieve_rag_articles(request: Request, question: str) -> list[dict]:
+    """두 RAG endpoint가 공유하는 상위 법령 조문 검색"""
+    return await asyncio.to_thread(
+        retrieve_articles,
+        encoder=request.app.state.encoder,
+        collection=request.app.state.collection,
+        question=question,
+        top_k=DEFAULT_TOP_K,
+    )
 
 
 @asynccontextmanager
@@ -125,15 +136,14 @@ async def ask_rag(payload: RagRequest, request: Request) -> RagResponse:
     await asyncio.to_thread(prepare_rag_resources, request.app)
 
     generator = request.app.state.generator
-    encoder = request.app.state.encoder
-    collection = request.app.state.collection
 
     started_at = perf_counter()
-    articles = await asyncio.to_thread(
-        retrieve_articles, encoder, collection, payload.question, 5
-    )
+    articles = await retrieve_rag_articles(request, payload.question)
     response = await asyncio.to_thread(
-        answer_question, generator, payload.question, articles
+        answer_question,
+        generator=generator,
+        question=payload.question,
+        articles=articles,
     )
     generation_seconds = perf_counter() - started_at
 
@@ -160,14 +170,13 @@ async def ask_rag_stream(
     await asyncio.to_thread(prepare_rag_resources, request.app)
 
     generator = request.app.state.generator
-    encoder = request.app.state.encoder
-    collection = request.app.state.collection
-
-    articles = await asyncio.to_thread(
-        retrieve_articles, encoder, collection, payload.question, 5
-    )
+    articles = await retrieve_rag_articles(request, payload.question)
 
     return StreamingResponse(
-        stream_answer_question(generator, payload.question, articles),
+        stream_answer_question(
+            generator=generator,
+            question=payload.question,
+            articles=articles,
+        ),
         media_type="text/plain; charset=utf-8",
     )

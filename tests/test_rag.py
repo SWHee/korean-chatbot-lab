@@ -46,6 +46,30 @@ def test_format_context_includes_source_and_text() -> None:
     )
 
 
+def test_build_rag_inputs_combines_question_and_articles() -> None:
+    """일괄·스트리밍 생성이 공유할 question·context 입력 구성"""
+    articles = [
+        {
+            "law_name": "예금자보호법 시행령",
+            "article_no": "제18조",
+            "effective_date": "20250901",
+            "text": "보험금 한도는 1억원",
+        }
+    ]
+
+    inputs = rag_module.build_rag_inputs(
+        "예금은 얼마까지 보호되나요?", articles
+    )
+
+    assert inputs == {
+        "question": "예금은 얼마까지 보호되나요?",
+        "context": (
+            "출처: 예금자보호법 시행령 제18조 (시행일: 20250901)\n"
+            "보험금 한도는 1억원"
+        ),
+    }
+
+
 def test_rag_prompt_formats_question_and_context() -> None:
     """질문과 법령 문맥을 system·human 메시지로 변환"""
     prompt_value = rag_module.RAG_PROMPT.invoke(

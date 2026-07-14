@@ -29,8 +29,10 @@ def parse_law(path: str | Path) -> list[Article]:
     for unit in root.iter("조문단위"):
         if unit.findtext("조문여부") != "조문":  # '전문'은 장·절 표제
             continue
-        branch = unit.findtext("조문가지번호")
-        article_no = f"제{unit.findtext('조문번호')}조" + (f"의{branch}" if branch else "")
+        article_branch = unit.findtext("조문가지번호")
+        article_no = f"제{unit.findtext('조문번호')}조"
+        if article_branch:
+            article_no += f"의{article_branch}"
         text = "\n".join(
             content.strip()
             for elem in unit.iter()

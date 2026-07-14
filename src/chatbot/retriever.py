@@ -3,6 +3,9 @@
 from chatbot.embedding import embed_texts
 from chatbot.vectorstore import search
 
+DEFAULT_TOP_K = 5
+DEFAULT_CANDIDATE_K = 50
+
 
 def embed_query(encoder, question: str) -> list[float]:
     """질문 하나의 정규화된 임베딩 벡터"""
@@ -10,14 +13,20 @@ def embed_query(encoder, question: str) -> list[float]:
 
 
 def retrieve_chunks(
-    encoder, collection, question: str, top_k: int = 5
+    encoder,
+    collection,
+    question: str,
+    top_k: int = DEFAULT_TOP_K,
 ) -> list[dict]:
     """질문과 가까운 법령 청크 목록"""
     query_embedding = embed_query(encoder, question)
     return search(collection, query_embedding, top_k=top_k)
 
 
-def deduplicate_articles(chunks: list[dict], top_k: int = 5) -> list[dict]:
+def deduplicate_articles(
+    chunks: list[dict],
+    top_k: int = DEFAULT_TOP_K,
+) -> list[dict]:
     """법령명과 조문번호가 겹치지 않는 상위 청크 목록"""
     selected = []
     seen = set()
@@ -40,8 +49,8 @@ def retrieve_articles(
     encoder,
     collection,
     question: str,
-    top_k: int = 5,
-    candidate_k: int = 50,
+    top_k: int = DEFAULT_TOP_K,
+    candidate_k: int = DEFAULT_CANDIDATE_K,
 ) -> list[dict]:
     """후보 청크 검색과 조문 단위 중복 제거"""
     chunks = retrieve_chunks(encoder, collection, question, top_k=candidate_k)

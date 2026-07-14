@@ -14,6 +14,7 @@ from transformers import (
 
 MODEL_ID = "Qwen/Qwen3-4B-Instruct-2507"
 MAX_NEW_TOKENS = 128
+STREAM_TIMEOUT_SECONDS = 60.0
 
 
 class Generator:
@@ -78,7 +79,8 @@ class Generator:
             skip_special_tokens=True,
         )[0]
 
-    def _generate_stream(self,
+    def _generate_stream(
+        self,
         model_inputs: BatchEncoding,
         streamer: TextIteratorStreamer,
     ) -> None:
@@ -97,7 +99,7 @@ class Generator:
             self.tokenizer,
             skip_prompt=True,
             skip_special_tokens=True,
-            timeout=60.0, # 생성 지연 시 60초 후 종료. 변경 가능
+            timeout=STREAM_TIMEOUT_SECONDS,
         )
 
         # 생성과 response 전송을 동시에 진행

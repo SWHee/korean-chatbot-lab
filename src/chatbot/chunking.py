@@ -9,6 +9,8 @@ from chatbot.statutes import Article
 
 # 조문 전체가 삭제된 스텁 ("제19조 삭제 <1997.12.31>" 한 줄)
 _DELETED_STUB = re.compile(r"^제\d+조(의\d+)?\s*삭제\s*<")
+DEFAULT_MAX_CHARS = 1000
+DEFAULT_OVERLAP = 100
 
 
 @dataclass(frozen=True)
@@ -31,7 +33,9 @@ def _source_header(article: Article) -> str:
 
 
 def chunk_articles(
-    articles: list[Article], max_chars: int = 1000, overlap: int = 100
+    articles: list[Article],
+    max_chars: int = DEFAULT_MAX_CHARS,
+    overlap: int = DEFAULT_OVERLAP,
 ) -> list[Chunk]:
     """조문 목록을 청크 목록으로 변환
 
@@ -39,7 +43,9 @@ def chunk_articles(
     재귀 분할. 모든 청크는 정확히 하나의 조문에 속한다.
     """
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=max_chars, chunk_overlap=overlap, separators=["\n", " ", ""]
+        chunk_size=max_chars,
+        chunk_overlap=overlap,
+        separators=["\n", " ", ""],
     )
     chunks = []
     for article in articles:

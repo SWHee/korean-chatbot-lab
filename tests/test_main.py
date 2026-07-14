@@ -94,10 +94,43 @@ def test_ask_rag_route_exists() -> None:
     assert "/ask-rag" in main_module.app.openapi()["paths"]
 
 
+def test_retrieve_rag_articles_uses_shared_top_k(monkeypatch) -> None:
+    """두 RAG endpoint가 공유할 법령 검색 준비"""
+    request = create_rag_request()
+    articles = [{"article_no": "제18조"}]
+    calls = {}
+
+    def fake_retrieve_articles(encoder, collection, question, top_k):
+        calls.update(
+            encoder=encoder,
+            collection=collection,
+            question=question,
+            top_k=top_k,
+        )
+        return articles
+
+    monkeypatch.setattr(main_module, "retrieve_articles", fake_retrieve_articles)
+
+    result = asyncio.run(
+        main_module.retrieve_rag_articles(
+            request,
+            "예금은 얼마까지 보호되나요?",
+        )
+    )
+
+    assert result == articles
+    assert calls == {
+        "encoder": request.app.state.encoder,
+        "collection": request.app.state.collection,
+        "question": "예금은 얼마까지 보호되나요?",
+        "top_k": 5,
+    }
+
+
 def test_ask_rag_returns_answer_sources_and_generation_seconds(monkeypatch) -> None:
     """RAG 검색 근거와 답변 반환"""
     times = iter([20.0, 23.0])
-    articles = [
+    retrieved_articles = [
         {
             "law_name": "예금자보호법 시행령",
             "article_no": "제18조",
@@ -110,11 +143,11 @@ def test_ask_rag_returns_answer_sources_and_generation_seconds(monkeypatch) -> N
     def fake_retrieve_articles(encoder, collection, question, top_k):
         assert question == "예금은 얼마까지 보호되나요?"
         assert top_k == 5
-        return articles
+        return retrieved_articles
 
-    def fake_answer_question(generator, question, retrieved_articles):
+    def fake_answer_question(generator, question, articles):
         assert question == "예금은 얼마까지 보호되나요?"
-        assert retrieved_articles == articles
+        assert articles == retrieved_articles
         return "예금은 1인당 1억원까지 보호됩니다."
 
     monkeypatch.setattr(main_module, "perf_counter", lambda: next(times))
@@ -141,7 +174,7 @@ def test_ask_rag_stream_route_exists() -> None:
 
 def test_ask_rag_stream_returns_plain_text_tokens(monkeypatch) -> None:
     """RAG 답변 조각을 순수 텍스트로 전송"""
-    articles = [
+    retrieved_articles = [
         {
             "law_name": "예금자보호법 시행령",
             "article_no": "제18조",
@@ -152,11 +185,11 @@ def test_ask_rag_stream_returns_plain_text_tokens(monkeypatch) -> None:
     ]
 
     def fake_retrieve_articles(encoder, collection, question, top_k):
-        return articles
+        return retrieved_articles
 
-    def fake_stream_answer_question(generator, question, retrieved_articles):
+    def fake_stream_answer_question(generator, question, articles):
         assert question == "예금은 얼마까지 보호되나요?"
-        assert retrieved_articles == articles
+        assert articles == retrieved_articles
         yield "예금은 "
         yield "1억원까지 보호됩니다."
 

@@ -4,7 +4,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda
 
-from chatbot.retriever import retrieve_articles
+from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
 
 
 RAG_PROMPT = ChatPromptTemplate.from_messages(
@@ -32,6 +32,14 @@ def format_context(articles: list[dict]) -> str:
     return "\n\n".join(blocks)
 
 
+def build_rag_inputs(question: str, articles: list[dict]) -> dict[str, str]:
+    """일괄·스트리밍 생성이 공유하는 question·context 입력"""
+    return {
+        "question": question,
+        "context": format_context(articles),
+    }
+
+
 def create_model_runnable(generator) -> RunnableLambda:
     """프로젝트 Generator를 LCEL model 단계로 연결한 Runnable"""
 
@@ -54,15 +62,20 @@ def create_rag_chain(generator) -> Runnable:
 def answer_question(generator, question: str, articles: list[dict]) -> str:
     """검색 조문 목록 기반 RAG 답변"""
     chain = create_rag_chain(generator)
-    context = format_context(articles)
-
-    return chain.invoke({"question": question, "context": context})
+    rag_inputs = build_rag_inputs(
+        question=question,
+        articles=articles,
+    )
+    return chain.invoke(rag_inputs)
 
 
 def stream_answer_question(generator, question: str, articles: list[dict]):
     """검색 조문 목록 기반 RAG 답변 조각"""
-    context = format_context(articles)
-    prompt_value = RAG_PROMPT.invoke({"question": question, "context": context})
+    rag_inputs = build_rag_inputs(
+        question=question,
+        articles=articles,
+    )
+    prompt_value = RAG_PROMPT.invoke(rag_inputs)
     prompt_text = prompt_value.to_string()
 
     return generator.stream(prompt_text)
@@ -73,8 +86,17 @@ def answer_with_retrieval(
     encoder,
     collection,
     question: str,
-    top_k: int = 5,
+    top_k: int = DEFAULT_TOP_K,
 ) -> str:
     """검색과 답변 생성을 연결한 RAG 실행"""
-    articles = retrieve_articles(encoder, collection, question, top_k=top_k)
-    return answer_question(generator, question, articles)
+    articles = retrieve_articles(
+        encoder=encoder,
+        collection=collection,
+        question=question,
+        top_k=top_k,
+    )
+    return answer_question(
+        generator=generator,
+        question=question,
+        articles=articles,
+    )
