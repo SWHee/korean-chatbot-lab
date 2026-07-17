@@ -21,7 +21,8 @@
 
 ```mermaid
 flowchart LR
-    U[사용자 질문] --> API[FastAPI]
+    U[사용자 질문] --> UI[Streamlit 채팅 UI]
+    UI --> API[FastAPI]
 
     API --> C[/chat · /chat/stream/]
     C --> G[Generator 경계]
@@ -50,11 +51,11 @@ flowchart LR
 - 법령 XML 수집, 조문 파싱, 조문 경계 기반 청킹
 - KURE-v1 모델 비교·선정과 Chroma 인덱스 생성
 - 질문 임베딩 → 조문 검색 → LCEL 답변 생성의 최소 RAG 흐름
+- Streamlit 기반 법령 RAG 채팅·스트리밍 화면
 - 검색 결과와 기준 검색의 일치 확인, retrieval 평가 질문 관리
 
 ## 다음에 이어갈 범위
 
-- Streamlit 화면으로 일반 대화와 법령 RAG를 편하게 테스트
 - 금융상품 한눈에 API로 최신 예·적금 상품 후보 조회 연결
 - 법령 설명과 상품 조회를 함께 다뤄야 할 때 LangGraph 상태 흐름 검토
 
@@ -102,6 +103,18 @@ Hugging Face backend를 확인하고 싶다면 서버 실행 전에 환경 변�
 ```bash
 CHATBOT_BACKEND=hf uv run fastapi dev
 ```
+
+### 4. 채팅 UI 실행
+
+FastAPI 서버를 켜 둔 상태에서 새 터미널을 열어 실행합니다.
+
+```bash
+uv run streamlit run streamlit_app.py
+```
+
+브라우저에서 `http://localhost:8501`을 열면 법령 RAG 답변을 채팅 형태로 확인할
+수 있습니다. 화면에는 이전 메시지가 남지만, 현재 모델은 질문 사이의 문맥을 기억하지
+않습니다.
 
 ## API 사용 예시
 
@@ -186,6 +199,8 @@ uv run python scripts/verify_index.py
 
 ```text
 korean-chatbot/
+├── .streamlit/config.toml       Streamlit 색상·화면 설정
+├── streamlit_app.py             법령 RAG 채팅·스트리밍 UI
 ├── data/
 │   ├── laws/                    법령 XML 원문과 출처 정보
 │   ├── evaluation/              RAG 개발·회귀 평가 Dataset
