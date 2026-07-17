@@ -12,6 +12,7 @@ SCRIPT = run_path(
 )
 DATASET_NAME = SCRIPT["DATASET_NAME"]
 find_dataset_example = SCRIPT["find_dataset_example"]
+run_full_dataset_experiment = SCRIPT["run_full_dataset_experiment"]
 run_single_question_experiment = SCRIPT["run_single_question_experiment"]
 
 
@@ -73,4 +74,30 @@ def test_run_single_question_experiment_uses_one_worker() -> None:
     assert captured["max_concurrency"] == 1
     assert captured["client"] is client
     assert captured["metadata"]["question_id"] == "A1"
+    assert len(captured["evaluators"]) == 1
+
+
+def test_run_full_dataset_experiment_uses_registered_dataset() -> None:
+    """Dataset 이름으로 전체 문항을 동시성 1로 실행"""
+    client = FakeClient([])
+    target = lambda inputs: inputs
+    captured = {}
+
+    def fake_evaluate(received_target, **kwargs):
+        captured["target"] = received_target
+        captured.update(kwargs)
+        return "experiment-results"
+
+    result = run_full_dataset_experiment(
+        client=client,
+        target=target,
+        evaluate_fn=fake_evaluate,
+    )
+
+    assert result == "experiment-results"
+    assert captured["target"] is target
+    assert captured["data"] == DATASET_NAME
+    assert captured["max_concurrency"] == 1
+    assert captured["client"] is client
+    assert "question_id" not in captured["metadata"]
     assert len(captured["evaluators"]) == 1

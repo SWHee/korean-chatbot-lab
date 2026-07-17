@@ -21,7 +21,8 @@ from chatbot.vectorstore import open_collection
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_QUESTION_ID = "A1"
-EXPERIMENT_PREFIX = "rag-v1-single"
+SINGLE_EXPERIMENT_PREFIX = "rag-v1-single"
+FULL_EXPERIMENT_PREFIX = "rag-v1-baseline"
 
 
 def find_dataset_example(client: Client, question_id: str):
@@ -71,7 +72,27 @@ def run_single_question_experiment(
             "corpus_snapshot": CORPUS_SNAPSHOT,
             "question_id": question_id,
         },
-        experiment_prefix=EXPERIMENT_PREFIX,
+        experiment_prefix=SINGLE_EXPERIMENT_PREFIX,
+        max_concurrency=1,
+        client=client,
+    )
+
+
+def run_full_dataset_experiment(
+    client: Client,
+    target: Callable,
+    evaluate_fn: Callable = evaluate,
+):
+    """Dataset 전체 문항을 한 요청씩 실행하고 검색 점수 업로드"""
+    return evaluate_fn(
+        target,
+        data=DATASET_NAME,
+        evaluators=[langsmith_retrieval_evaluator],
+        metadata={
+            "dataset": DATASET_VERSION,
+            "corpus_snapshot": CORPUS_SNAPSHOT,
+        },
+        experiment_prefix=FULL_EXPERIMENT_PREFIX,
         max_concurrency=1,
         client=client,
     )
@@ -81,6 +102,11 @@ def parse_args() -> argparse.Namespace:
     """실행할 Dataset 질문 ID 입력"""
     parser = argparse.ArgumentParser()
     parser.add_argument("--question-id", default=DEFAULT_QUESTION_ID)
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="등록된 Dataset 24문항 전체 실행",
+    )
     return parser.parse_args()
 
 
@@ -90,19 +116,23 @@ def main() -> None:
     load_local_env(PROJECT_ROOT / ".env")
     client = Client()
 
-    # 잘못된 질문 ID는 모델을 적재하기 전에 확인
-    find_dataset_example(client, args.question_id)
+    if not args.all:
+        # 잘못된 질문 ID는 모델을 적재하기 전에 확인
+        find_dataset_example(client, args.question_id)
 
     target = create_evaluation_target(
         generator=OllamaGenerator(),
         encoder=load_encoder(),
         collection=open_collection(),
     )
-    results = run_single_question_experiment(
-        client=client,
-        target=target,
-        question_id=args.question_id,
-    )
+    if args.all:
+        results = run_full_dataset_experiment(client=client, target=target)
+    else:
+        results = run_single_question_experiment(
+            client=client,
+            target=target,
+            question_id=args.question_id,
+        )
 
     print(f"Experiment: {results.experiment_name}")
     if results.url:
