@@ -1,0 +1,12 @@
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#FEE500"
+backgroundColor = "#B2C7D9"
+secondaryBackgroundColor = "#F7F7F7"
+textColor = "#252525"
+font = "sans-serif"
+baseRadius = "large"
+buttonRadius = "full"
