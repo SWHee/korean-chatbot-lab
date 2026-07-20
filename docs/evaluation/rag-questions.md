@@ -45,22 +45,23 @@ LangSmith에서 실험이 바뀌어도 같은 질문의 검색 순위와 답변 
 
 | 지표 | 비교 대상 | Dataset이 제공하는 값 | 적용 범위 |
 | --- | --- | --- | --- |
-| ID 기반 Context Precision@5 | top-5 검색 조문 ↔ 관련 조문 ID | 필수·보조 정답 조문 | retrieval 가능 15개 |
-| ID 기반 Context Recall@5 | top-5 검색 조문 ↔ 필수 조문 ID | 필수 정답 조문 | retrieval 가능 15개 |
+| `precision_top_5` | 상위 5개 검색 조문 ↔ 관련 조문 ID | 필수·보조 정답 조문 | retrieval 가능 15개 |
+| `recall_top_5` | 상위 5개 검색 조문 ↔ 필수 조문 ID | 필수 정답 조문 | retrieval 가능 15개 |
 | Faithfulness | 생성 답변 ↔ 실제 검색 문맥 | 생성 답변과 평가 target이 보존한 조문 본문 | retrieval 가능 15개 |
 | Answer Relevancy | 질문 ↔ 생성 답변 | `question`·생성 답변 | 전체 24개 |
 
-Context Precision과 Recall은 비슷해 보여도 보는 실패가 다르다. Precision은 top-5에
+조문 Precision과 Recall은 비슷해 보여도 보는 실패가 다르다. Precision은 상위 5개에
 불필요한 조문이 얼마나 섞였는지 보고, Recall은 필수 조문을 빠뜨렸는지 본다.
 Faithfulness는 검색이 잘됐는지와 별개로 모델이 근거 밖 주장을 만들었는지 확인한다.
 Answer Relevancy는 답변이 질문을 직접 다뤘는지 보며, 사실이 맞는지는 이 점수만으로
 판정하지 않는다. `required_claims`와 `forbidden_claims`는 검색 점수가 아니라 생성
 답변을 검사하는 기준으로 사용한다.
 
-현재 Dataset은 이 지표들을 계산할 입력을 갖추었지만 아직 점수를 실행한 상태는
-아니다. 다음 단계에서 실제 `/ask-rag`와 같은 검색·생성 경로의 출력과 연결한다.
-현재 API의 `sources`에는 조문 본문이 없으므로, 평가 target은 검색된 본문을
-`retrieved_contexts`로 별도 보존해야 한다.
+현재 Dataset은 `/ask-rag`와 같은 검색·생성 경로의 평가 함수와 연결되어 LangChain
+v1 기준선에 사용됐다. 일반 API의 `sources`에는 조문 본문이 없지만, 평가 함수는
+Faithfulness 확인을 위해 모델에 제공한 본문을 `retrieved_contexts`로 별도 보존한다.
+실행 결과는 [`langchain-baseline-results.md`](langchain-baseline-results.md)에서
+확인할 수 있다.
 
 ## A. 법령 근거형 (주력, 12개)
 
