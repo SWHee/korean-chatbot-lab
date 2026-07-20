@@ -1,100 +1,108 @@
-# LangSmith 추적 워크플로우
+# LangSmith 추적과 평가 흐름
 
-LangSmith는 지금 만든 RAG가 실제로 어떤 순서로 움직이는지 눈으로 확인하기 위해
-붙인다. 아직은 점수를 많이 만들기보다, 한 요청 안에서 검색과 생성이 어떻게
-이어지는지 보는 것이 먼저다.
+LangSmith는 현재 RAG가 어떤 순서로 실행됐는지 확인하고, 같은 Dataset으로 변경
+전후를 비교하는 데 사용한다. 이 프로젝트에서는 trace 확인과 Dataset 평가를
+순서대로 연결했다.
 
-## 왜 지금 붙이나
+## Trace에서 보는 것
 
-현재 프로젝트에는 이미 법령 인덱스, retriever, LCEL RAG 체인이 있다. 그래서
-LangSmith를 붙이면 처음부터 빈 화면을 보는 것이 아니라, 실제 `/ask-rag` 요청이
-어떤 흐름으로 처리되는지 바로 확인할 수 있다.
+`/ask-rag` 요청 한 건은 다음 흐름으로 처리된다.
 
-지금 보고 싶은 것은 세 가지다.
+```text
+사용자 질문
+  → KURE-v1 질문 임베딩
+  → Chroma 조문 검색
+  → 검색 문맥 구성
+  → LCEL prompt · Ollama 생성
+  → 답변과 출처 반환
+```
 
-- 질문이 어떤 prompt로 바뀌는지
-- 어떤 법령 조문이 검색되어 context에 들어가는지
-- 답변이 검색 근거 안에서 만들어졌는지
+LangSmith에서는 입력 질문, prompt에 들어간 문맥, 생성 답변과 단계별 시간을 본다.
+답변이 이상할 때 검색 조문부터 틀렸는지, 조문은 맞지만 생성 모델이 잘못 해석했는지
+나눠 확인하는 것이 목적이다.
 
-## 1차 목표: LCEL 체인 trace 확인
+## 기본 연결
 
-먼저 `rag.py`의 LCEL 체인이 LangSmith에 보이는지 확인한다. 공식 문서 기준으로
-LangChain 코드는 환경 변수를 설정하면 trace가 남는다.
+로컬 `.env`에 다음 값을 둔다.
 
-```bash
+```text
 LANGSMITH_TRACING=true
 LANGSMITH_API_KEY=<발급받은 키>
 LANGSMITH_PROJECT=korean-chatbot-rag-dev
 ```
 
-로컬에서는 `.env.example`을 복사해 `.env`를 만들고, `LANGSMITH_API_KEY` 값만
-실제 키로 바꾼다. 서버는 시작할 때 `.env`를 자동으로 읽는다.
+FastAPI 서버는 시작할 때 `.env`를 읽는다. 서버를 실행하고 `/ask-rag`를 호출하면
+`korean-chatbot-rag-dev`의 Tracing 화면에서 실행을 확인할 수 있다.
 
 ```bash
-cp .env.example .env
-# .env 안의 LANGSMITH_API_KEY 값을 실제 키로 수정
 uv run fastapi dev
+
+curl -X POST http://127.0.0.1:8000/ask-rag \
+  -H "Content-Type: application/json" \
+  -d '{"question":"은행이 파산하면 내 예금은 얼마까지 보호받나요?"}'
 ```
 
-이 상태에서 서버를 실행하고 `/ask-rag`를 호출하면 LangSmith project에서 trace를
-확인한다. 처음에는 `/ask-rag/stream`보다 `/ask-rag`가 보기 쉽다. JSON 응답에
-답변과 sources가 같이 있기 때문이다.
+서버가 꺼지면 새 요청이 없으므로 trace도 더 생기지 않는다. 이미 전송된 trace와
+Experiment는 LangSmith 웹에 남는다.
 
-확인할 화면은 다음 정도면 충분하다.
+## Dataset 평가 연결
 
-- 입력 질문
-- prompt에 들어간 법령 context
-- 생성 모델에 전달된 최종 메시지
-- 모델이 만든 답변
-- 각 단계에 걸린 시간
+현재 연결은 LangSmith 공식 흐름과 같은 네 단계다.
 
-## 2차 목표: retriever 단계도 따로 보기
+| 개념 | 현재 프로젝트 |
+| --- | --- |
+| Dataset | `rag-v1-dev.jsonl`의 24문항 |
+| Target | KURE·Chroma·Ollama RAG를 실행하는 `run_rag_evaluation()` |
+| Evaluator | 조문 검색 Precision·Recall, Gemini Faithfulness |
+| Experiment | Dataset을 현재 RAG로 실행한 한 번의 결과 묶음 |
 
-LCEL trace만으로는 검색 단계가 충분히 잘 보이지 않을 수 있다. 우리 retriever는 직접
-만든 Python 함수이고, Chroma 검색도 LangChain retriever 객체가 아니기 때문이다.
+OpenAI quickstart 예제의 모델과 패키지를 그대로 사용하지 않는 이유는 생성 모델이
+로컬 Ollama이고 Judge가 Gemini이기 때문이다. 평가 개념은 같고 구현체만 프로젝트에
+맞게 바뀐다.
 
-하지만 처음부터 수동 trace를 많이 붙이면 화면이 복잡해진다. 그래서 1차에서는
-환경 변수와 LCEL trace만 확인한다. 검색 단계가 충분히 보이지 않는다는 것을 직접
-확인한 뒤, 그때 `retrieve_articles` 주변에 얇은 수동 trace를 추가한다.
+### Dataset 등록
 
-```text
-ask-rag 요청
-  → retrieve_articles
-  → format_context
-  → generate answer
+```bash
+uv run python scripts/register_evaluation_dataset.py
 ```
 
-이렇게 나눠 보면 "답변이 이상한 이유"를 더 쉽게 찾을 수 있다. 예를 들어 보호
-한도 질문에서 정답 조문이 검색되지 않았다면, 생성 모델 문제가 아니라 retriever
-문제로 볼 수 있다.
+질문은 Inputs, `reference_answer`는 Reference Outputs로 등록한다. 정답 조문과 지표
+적용 여부는 웹 표를 복잡하게 만들지 않도록 example의 `metadata.rubric`에 둔다.
 
-## 무엇을 보고 개선하나
+### 한 문항 확인
 
-| LangSmith에서 보는 것 | 알 수 있는 것 | 다음 개선 후보 |
-| --- | --- | --- |
-| 검색된 sources | 질문에 맞는 조문이 들어왔는지 | 청킹, top-k, 질의 변환 |
-| 최종 prompt | 근거가 너무 길거나 부족한지 | context 포맷, prompt 문구 |
-| 모델 답변 | 근거 밖 내용을 말하는지 | system prompt 강화 |
-| 단계별 시간 | 어디서 오래 걸리는지 | 모델 로드, 질문 임베딩, 생성 지연 확인 |
+```bash
+uv run python scripts/run_rag_evaluation.py --question-ids A1
+```
 
-지금 단계에서는 "정답률 몇 점"보다 "왜 이런 답이 나왔는지 설명할 수 있는가"가 더
-중요하다. 평가 지표는 trace를 몇 번 보면서 실패 유형이 보인 뒤에 붙이는 편이
-자연스럽다.
+처음에는 입력, 답변, 검색 출처와 세 평가 Feedback이 보이는지만 확인한다. 모델과
+인덱스를 모두 사용하는 평가이므로 FastAPI 서버는 필요 없지만 Ollama는 실행 중이어야
+한다.
 
-## 우리 프로젝트의 진행 순서
+### 선택 문항 또는 전체 실행
 
-1. `.env`에 LangSmith 키와 project 이름을 넣는다.
-2. `/ask-rag` 한 번을 실행해 LCEL trace가 남는지 확인한다.
-3. trace에서 prompt, context, 답변을 직접 확인한다.
-4. 검색 단계가 잘 안 보이면 `retrieve_articles` 주변에 수동 trace를 추가한다.
-5. 같은 질문을 여러 번 실행해 "검색 실패"와 "생성 실패"를 구분한다.
-6. 그 다음에 작은 평가셋으로 offline evaluation을 붙인다.
+```bash
+uv run python scripts/run_rag_evaluation.py --question-ids A1 A2 A3 A4 A5
+uv run python scripts/run_rag_evaluation.py --all
+```
 
-LangGraph는 이 다음 문제다. 먼저 현재 RAG 흐름을 LangSmith에서 설명할 수 있어야,
-나중에 graph node가 늘어나도 어느 단계가 문제인지 따라갈 수 있다.
+`max_concurrency=1`로 한 요청씩 실행한다. 로컬 모델 부하를 줄이려면 문항 ID를 여러
+묶음으로 나눌 수 있다. 두 실행을 비교할 때는 Dataset, 모델, prompt, 검색 설정과
+evaluator를 동일하게 유지한다.
+
+## 현재 기준선
+
+LangChain v1은 단일 Experiment에서 24문항을 평가했다. 누락과 실행 오류가 없고,
+평가 대상 15문항의 검색 점수와 Faithfulness가 모두 존재하는 이 실행을 기준선으로
+사용한다. 앞선 분할 실행과 한도 실패 실행은 비교·트러블슈팅 기록으로 남긴다.
+
+결과는 [`langchain-baseline-results.md`](../evaluation/langchain-baseline-results.md),
+연결 중 겪은 문제는
+[`langsmith-evaluation-troubleshooting.md`](langsmith-evaluation-troubleshooting.md)에
+분리해 기록한다.
 
 공식 문서:
 
-- https://docs.langchain.com/langsmith/observability
-- https://docs.langchain.com/langsmith/trace-with-langchain
-- https://docs.langchain.com/langsmith/observability-quickstart
+- [LangSmith observability](https://docs.langchain.com/langsmith/observability)
+- [Trace with LangChain](https://docs.langchain.com/langsmith/trace-with-langchain)
+- [Evaluation quickstart](https://docs.langchain.com/langsmith/evaluation-quickstart)
