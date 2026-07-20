@@ -8,6 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.138.2",
     "httpx>=0.28.1",
     "langchain-core>=1.4.8",
+    "langchain-google-genai>=4.2.7",
     "langchain-text-splitters>=1.1.2",
     "langsmith>=0.9.7",
     "python-dotenv>=1.2.1",

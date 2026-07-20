@@ -13,7 +13,11 @@ from chatbot.evaluation import (
     DATASET_VERSION,
     run_rag_evaluation,
 )
-from chatbot.evaluators import langsmith_retrieval_evaluator
+from chatbot.evaluators import (
+    JUDGE_MODEL_NAME,
+    create_faithfulness_evaluator,
+    langsmith_retrieval_evaluator,
+)
 from chatbot.ollama_generator import OllamaGenerator
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
@@ -21,7 +25,7 @@ from chatbot.vectorstore import open_collection
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_QUESTION_ID = "A1"
-SINGLE_EXPERIMENT_PREFIX = "rag-v1-single"
+BATCH_EXPERIMENT_PREFIX = "rag-v1-batch"
 FULL_EXPERIMENT_PREFIX = "rag-v1-baseline"
 
 
@@ -55,24 +59,26 @@ def create_evaluation_target(generator, encoder, collection) -> Callable:
     return target
 
 
-def run_single_question_experiment(
+def run_selected_questions_experiment(
     client: Client,
     target: Callable,
-    question_id: str,
+    question_ids: list[str],
+    examples: list,
+    faithfulness_evaluator,
     evaluate_fn: Callable = evaluate,
 ):
-    """Dataset 한 문항을 실행하고 검색 평가 점수 업로드"""
-    example = find_dataset_example(client, question_id)
+    """선택한 Dataset 문항을 한 요청씩 평가"""
     return evaluate_fn(
         target,
-        data=[example],
-        evaluators=[langsmith_retrieval_evaluator],
+        data=examples,
+        evaluators=[langsmith_retrieval_evaluator, faithfulness_evaluator],
         metadata={
             "dataset": DATASET_VERSION,
             "corpus_snapshot": CORPUS_SNAPSHOT,
-            "question_id": question_id,
+            "question_ids": question_ids,
+            "judge_model": JUDGE_MODEL_NAME,
         },
-        experiment_prefix=SINGLE_EXPERIMENT_PREFIX,
+        experiment_prefix=BATCH_EXPERIMENT_PREFIX,
         max_concurrency=1,
         client=client,
     )
@@ -81,16 +87,18 @@ def run_single_question_experiment(
 def run_full_dataset_experiment(
     client: Client,
     target: Callable,
+    faithfulness_evaluator,
     evaluate_fn: Callable = evaluate,
 ):
-    """Dataset 전체 문항을 한 요청씩 실행하고 검색 점수 업로드"""
+    """Dataset 전체 문항을 한 요청씩 실행하고 검색·답변 점수 업로드"""
     return evaluate_fn(
         target,
         data=DATASET_NAME,
-        evaluators=[langsmith_retrieval_evaluator],
+        evaluators=[langsmith_retrieval_evaluator, faithfulness_evaluator],
         metadata={
             "dataset": DATASET_VERSION,
             "corpus_snapshot": CORPUS_SNAPSHOT,
+            "judge_model": JUDGE_MODEL_NAME,
         },
         experiment_prefix=FULL_EXPERIMENT_PREFIX,
         max_concurrency=1,
@@ -101,8 +109,13 @@ def run_full_dataset_experiment(
 def parse_args() -> argparse.Namespace:
     """실행할 Dataset 질문 ID 입력"""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--question-id", default=DEFAULT_QUESTION_ID)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--question-ids",
+        nargs="+",
+        help="순차 실행할 Dataset 질문 ID 목록",
+    )
+    mode.add_argument(
         "--all",
         action="store_true",
         help="등록된 Dataset 24문항 전체 실행",
@@ -115,10 +128,15 @@ def main() -> None:
     args = parse_args()
     load_local_env(PROJECT_ROOT / ".env")
     client = Client()
+    faithfulness_evaluator = create_faithfulness_evaluator()
+    question_ids = args.question_ids or [DEFAULT_QUESTION_ID]
+    examples = []
 
     if not args.all:
         # 잘못된 질문 ID는 모델을 적재하기 전에 확인
-        find_dataset_example(client, args.question_id)
+        examples = [
+            find_dataset_example(client, question_id) for question_id in question_ids
+        ]
 
     target = create_evaluation_target(
         generator=OllamaGenerator(),
@@ -126,12 +144,18 @@ def main() -> None:
         collection=open_collection(),
     )
     if args.all:
-        results = run_full_dataset_experiment(client=client, target=target)
-    else:
-        results = run_single_question_experiment(
+        results = run_full_dataset_experiment(
             client=client,
             target=target,
-            question_id=args.question_id,
+            faithfulness_evaluator=faithfulness_evaluator,
+        )
+    else:
+        results = run_selected_questions_experiment(
+            client=client,
+            target=target,
+            question_ids=question_ids,
+            examples=examples,
+            faithfulness_evaluator=faithfulness_evaluator,
         )
 
     print(f"Experiment: {results.experiment_name}")

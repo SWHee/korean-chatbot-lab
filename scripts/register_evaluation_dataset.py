@@ -26,20 +26,28 @@ def load_dataset_rows(path: Path = DATASET_PATH) -> list[dict]:
 
 def build_langsmith_example(row: dict) -> dict:
     """평가 문항 하나를 LangSmith example 형식으로 변환"""
-    reference_outputs = {
-        key: value
-        for key, value in row.items()
-        if key not in {"id", "split", "category", "question"}
+    rubric_excluded_keys = {
+        "id",
+        "split",
+        "category",
+        "question",
+        "corpus_snapshot",
+        "reference_answer",
+    }
+    rubric = {
+        key: value for key, value in row.items() if key not in rubric_excluded_keys
     }
 
     return {
         "id": uuid5(NAMESPACE_URL, f"{DATASET_NAME}:{row['id']}"),
         "inputs": {"question": row["question"]},
-        "outputs": reference_outputs,
+        "outputs": {"reference_answer": row["reference_answer"]},
         "metadata": {
             "question_id": row["id"],
             "category": row["category"],
             "dataset_version": DATASET_VERSION,
+            "corpus_snapshot": row["corpus_snapshot"],
+            "rubric": rubric,
         },
         "split": row["split"],
     }
@@ -47,7 +55,8 @@ def build_langsmith_example(row: dict) -> dict:
 
 def register_dataset(client: Client, rows: list[dict]):
     """Dataset을 준비하고 고정 ID example을 생성·갱신"""
-    if client.has_dataset(dataset_name=DATASET_NAME):
+    dataset_exists = client.has_dataset(dataset_name=DATASET_NAME)
+    if dataset_exists:
         dataset = client.read_dataset(dataset_name=DATASET_NAME)
     else:
         dataset = client.create_dataset(
@@ -57,11 +66,14 @@ def register_dataset(client: Client, rows: list[dict]):
         )
 
     examples = [build_langsmith_example(row) for row in rows]
-    response = client.create_examples(
-        dataset_id=dataset.id,
-        examples=examples,
-        max_concurrency=1,
-    )
+    if dataset_exists:
+        response = client.update_examples(dataset_id=dataset.id, updates=examples)
+    else:
+        response = client.create_examples(
+            dataset_id=dataset.id,
+            examples=examples,
+            max_concurrency=1,
+        )
     return dataset, response
 
 

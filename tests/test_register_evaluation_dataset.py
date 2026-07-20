@@ -24,6 +24,7 @@ class FakeClient:
         self.dataset = SimpleNamespace(id="dataset-id", name=DATASET_NAME)
         self.created_dataset = None
         self.created_examples = None
+        self.updated_examples = None
 
     def has_dataset(self, *, dataset_name: str) -> bool:
         assert dataset_name == DATASET_NAME
@@ -41,6 +42,10 @@ class FakeClient:
         self.created_examples = kwargs
         return {"count": len(kwargs["examples"])}
 
+    def update_examples(self, **kwargs):
+        self.updated_examples = kwargs
+        return {"count": len(kwargs["updates"])}
+
 
 def test_build_langsmith_example_separates_input_reference_and_metadata() -> None:
     """질문·정답 기준·식별 정보를 LangSmith 영역별로 분리"""
@@ -49,12 +54,15 @@ def test_build_langsmith_example_separates_input_reference_and_metadata() -> Non
     example = build_langsmith_example(row)
 
     assert example["inputs"] == {"question": row["question"]}
-    assert example["outputs"]["required_articles"] == row["required_articles"]
-    assert example["metadata"] == {
-        "question_id": "A1",
-        "category": "legal_grounding",
-        "dataset_version": "rag-v1-dev",
-    }
+    assert example["outputs"] == {"reference_answer": row["reference_answer"]}
+    assert example["metadata"]["question_id"] == "A1"
+    assert example["metadata"]["category"] == "legal_grounding"
+    assert example["metadata"]["dataset_version"] == "rag-v1-dev"
+    assert example["metadata"]["corpus_snapshot"] == "2026-07-06"
+    assert example["metadata"]["rubric"]["required_articles"] == row[
+        "required_articles"
+    ]
+    assert "reference_answer" not in example["metadata"]["rubric"]
     assert example["split"] == "dev"
     assert example["id"] == build_langsmith_example(row)["id"]
 
@@ -72,6 +80,7 @@ def test_register_dataset_creates_dataset_and_examples() -> None:
     assert client.created_examples["dataset_id"] == "dataset-id"
     assert len(client.created_examples["examples"]) == 2
     assert client.created_examples["max_concurrency"] == 1
+    assert client.updated_examples is None
 
 
 def test_register_dataset_reuses_existing_dataset() -> None:
@@ -81,4 +90,6 @@ def test_register_dataset_reuses_existing_dataset() -> None:
     register_dataset(client, load_dataset_rows()[:1])
 
     assert client.created_dataset is None
-    assert len(client.created_examples["examples"]) == 1
+    assert client.created_examples is None
+    assert client.updated_examples["dataset_id"] == "dataset-id"
+    assert len(client.updated_examples["updates"]) == 1

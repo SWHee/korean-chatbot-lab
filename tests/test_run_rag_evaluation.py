@@ -1,4 +1,4 @@
-"""LangSmith 단일 문항 experiment 실행 스크립트 테스트"""
+"""LangSmith 선택 문항 experiment 실행 스크립트 테스트"""
 
 from pathlib import Path
 from runpy import run_path
@@ -13,7 +13,7 @@ SCRIPT = run_path(
 DATASET_NAME = SCRIPT["DATASET_NAME"]
 find_dataset_example = SCRIPT["find_dataset_example"]
 run_full_dataset_experiment = SCRIPT["run_full_dataset_experiment"]
-run_single_question_experiment = SCRIPT["run_single_question_experiment"]
+run_selected_questions_experiment = SCRIPT["run_selected_questions_experiment"]
 
 
 class FakeClient:
@@ -49,10 +49,10 @@ def test_find_dataset_example_requires_exactly_one_match() -> None:
         find_dataset_example(FakeClient([]), "missing")
 
 
-def test_run_single_question_experiment_uses_one_worker() -> None:
-    """한 example과 검색 evaluator를 동시성 1로 실행"""
-    example = SimpleNamespace(id="example-id")
-    client = FakeClient([example])
+def test_run_selected_questions_experiment_uses_one_worker() -> None:
+    """선택한 example과 evaluator를 동시성 1로 실행"""
+    examples = [SimpleNamespace(id="example-1"), SimpleNamespace(id="example-2")]
+    client = FakeClient(examples)
     target = lambda inputs: inputs
     captured = {}
 
@@ -61,20 +61,23 @@ def test_run_single_question_experiment_uses_one_worker() -> None:
         captured.update(kwargs)
         return "experiment-results"
 
-    result = run_single_question_experiment(
+    result = run_selected_questions_experiment(
         client=client,
         target=target,
-        question_id="A1",
+        question_ids=["A1", "A2"],
+        examples=examples,
+        faithfulness_evaluator="faithfulness-evaluator",
         evaluate_fn=fake_evaluate,
     )
 
     assert result == "experiment-results"
     assert captured["target"] is target
-    assert captured["data"] == [example]
+    assert captured["data"] == examples
     assert captured["max_concurrency"] == 1
     assert captured["client"] is client
-    assert captured["metadata"]["question_id"] == "A1"
-    assert len(captured["evaluators"]) == 1
+    assert captured["metadata"]["question_ids"] == ["A1", "A2"]
+    assert captured["evaluators"][1] == "faithfulness-evaluator"
+    assert len(captured["evaluators"]) == 2
 
 
 def test_run_full_dataset_experiment_uses_registered_dataset() -> None:
@@ -91,6 +94,7 @@ def test_run_full_dataset_experiment_uses_registered_dataset() -> None:
     result = run_full_dataset_experiment(
         client=client,
         target=target,
+        faithfulness_evaluator="faithfulness-evaluator",
         evaluate_fn=fake_evaluate,
     )
 
@@ -100,4 +104,5 @@ def test_run_full_dataset_experiment_uses_registered_dataset() -> None:
     assert captured["max_concurrency"] == 1
     assert captured["client"] is client
     assert "question_id" not in captured["metadata"]
-    assert len(captured["evaluators"]) == 1
+    assert captured["evaluators"][1] == "faithfulness-evaluator"
+    assert len(captured["evaluators"]) == 2
