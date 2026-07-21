@@ -15,6 +15,7 @@
 | API | 일반 대화와 법령 RAG의 일반·스트리밍 요청 제공 |
 | RAG 데이터 | 금융소비자보호법·예금자보호법과 각 시행령, 총 4건 |
 | 검색 | KURE-v1 임베딩(1024차원) · Chroma 벡터스토어 |
+| 평가 | LangSmith Dataset 24문항 · 검색 Precision/Recall · Gemini Faithfulness |
 | 검증 | pytest와 임베딩·인덱스 재현 스크립트 |
 
 ## 아키텍처
@@ -52,15 +53,16 @@ flowchart LR
 - KURE-v1 모델 비교·선정과 Chroma 인덱스 생성
 - 질문 임베딩 → 조문 검색 → LCEL 답변 생성의 최소 RAG 흐름
 - Streamlit 기반 법령 RAG 채팅·스트리밍 화면
-- 검색 결과와 기준 검색의 일치 확인, retrieval 평가 질문 관리
+- LangSmith 24문항 Dataset과 LangChain v1 기준선 평가
 
 ## 다음에 이어갈 범위
 
+- 현재 RAG 동작을 유지한 최소 StateGraph 전환
+- 같은 Dataset으로 LangChain과 LangGraph 결과 비교
 - 금융상품 한눈에 API로 최신 예·적금 상품 후보 조회 연결
-- 법령 설명과 상품 조회를 함께 다뤄야 할 때 LangGraph 상태 흐름 검토
 
-LangGraph는 현재 RAG를 교체하는 대상이 아닙니다. 상품 API fallback, 질문 분기,
-여러 턴의 상태 관리처럼 흐름 제어가 실제로 필요해질 때 도입할 예정입니다.
+첫 LangGraph 단계에서는 검색과 답변 생성을 graph node로 옮기기만 합니다. 기준선과
+같은 결과가 나오는지 확인한 뒤 상품 API 분기와 상태 관리를 추가할 예정입니다.
 
 ## 빠르게 실행하기
 
@@ -189,11 +191,13 @@ uv run python scripts/verify_index.py
 
 | 문서 | 내용 |
 | --- | --- |
-| [RAG 파이프라인 개요](docs/others/rag-pipeline-overview.md) | 코드 파일별 인덱싱·검색 흐름 |
-| [외부 데이터와 API](docs/others/external-data-sources.md) | 법령 원문·금융상품 한눈에 API의 역할과 저장 기준 |
-| [RAG 평가 질문](docs/evaluation/rag-questions.md) | retrieval 평가용 질문과 정답 조문 기준 |
-| [RAG 기준선 평가 순서](docs/evaluation/rag-baseline-workflow.md) | LangGraph 전후를 같은 Dataset으로 비교하는 순서 |
-| [ADR](docs/adr/) | 모델·corpus·벡터스토어 선택 이유 |
+| [RAG 파이프라인 개요](docs/02-langchain-rag/03-guides/01-rag-pipeline-overview.md) | 코드 파일별 인덱싱·검색 흐름 |
+| [외부 데이터와 API](docs/06-other/01-external-data-sources.md) | 법령 원문·금융상품 한눈에 API의 역할과 저장 기준 |
+| [RAG 평가 질문](docs/03-langsmith-evaluation/02-rag-questions.md) | retrieval 평가용 질문과 정답 조문 기준 |
+| [RAG 기준선 평가 순서](docs/03-langsmith-evaluation/03-rag-baseline-workflow.md) | LangGraph 전후를 같은 Dataset으로 비교하는 순서 |
+| [LangChain v1 기준선 결과](docs/03-langsmith-evaluation/06-langchain-baseline-results.md) | 24문항 검색·답변 평가 결과 |
+| [첫 기준선 문제 해결](docs/03-langsmith-evaluation/08-langchain-baseline-troubleshooting.md) | 첫 평가에서 겪은 오류와 확인 순서 |
+| [LangGraph 전환 계획](docs/04-langgraph-migration/01-langgraph-migration-plan.md) | 현재 RAG를 StateGraph로 옮기는 작은 작업 순서 |
 
 ## 디렉터리 구조
 
@@ -206,15 +210,18 @@ korean-chatbot/
 │   ├── evaluation/              RAG 개발·회귀 평가 Dataset
 │   └── index/                   로컬 Chroma 인덱스 (Git 제외)
 ├── docs/
-│   ├── adr/                     주요 설계 결정
-│   ├── devlog/                  모델·RAG 실험에서 남긴 핵심 기록
-│   ├── evaluation/              retrieval 평가 질문과 정답 조문
-│   └── others/                  파이프라인·외부 데이터 가이드
+│   ├── 01-chatbot-fastapi/      모델 생성과 FastAPI 단계
+│   ├── 02-langchain-rag/        RAG 설계·실험·파이프라인
+│   ├── 03-langsmith-evaluation/ Dataset·추적·기준선 평가
+│   ├── 04-langgraph-migration/  StateGraph 전환 계획
+│   └── 06-other/                외부 데이터와 UI 기록
 ├── scripts/
 │   ├── collect_laws.py          법령 XML 수집
 │   ├── build_index.py           전체 법령 인덱스 재생성
 │   ├── compare_embeddings.py    임베딩 후보 비교
-│   └── verify_index.py          Chroma 검색 결과 검증
+│   ├── verify_index.py          Chroma 검색 결과 검증
+│   ├── register_evaluation_dataset.py  LangSmith Dataset 등록
+│   └── run_rag_evaluation.py    LangSmith 기준선 평가 실행
 ├── src/chatbot/
 │   ├── main.py                  FastAPI endpoint와 앱 수명주기
 │   ├── generator.py             Hugging Face Qwen3 생성기
@@ -225,6 +232,8 @@ korean-chatbot/
 │   ├── vectorstore.py           Chroma 컬렉션 접근과 검색
 │   ├── retriever.py             질문 검색과 조문 중복 제거
 │   ├── rag.py                   LCEL RAG 답변 체인
+│   ├── evaluation.py            평가용 RAG 실행 결과 구성
+│   ├── evaluators.py            검색·Faithfulness 평가
 │   └── settings.py              로컬 환경 변수 로드
 ├── tests/                       단위·흐름 검증
 └── experiments/from_scratch/    별도 보관한 Transformer 학습 실험

@@ -12,7 +12,7 @@ RAG 단계를 시작하며 주제와 근거 문서가 필요하다. 문서 원�
 설명할 수 있는 난이도의 금융 도메인으로 한정했다.
 
 주제 수준의 후보 비교와 선정 여정은 devlog
-`docs/devlog/rag/topic-and-data-selection.md`에 기록했다. 이 문서는 데이터
+`docs/02-langchain-rag/02-devlog/01-topic-and-data-selection.md`에 기록했다. 이 문서는 데이터
 선택의 결론만 요약한다.
 
 ## 고려한 선택지
@@ -72,7 +72,7 @@ RAG 단계를 시작하며 주제와 근거 문서가 필요하다. 문서 원�
 
 ## 검증 계획
 
-`docs/evaluation/rag-questions.md`의 평가 질문 24개로 검증한다. 인덱싱과
+`docs/03-langsmith-evaluation/02-rag-questions.md`의 평가 질문 24개로 검증한다. 인덱싱과
 체인이 완성되면 전체 질문을 실행해 베이스라인을 기록하고, 이후 LangSmith
 평가 단계의 기준선으로 사용한다. 질문에 적어 둔 조문 번호는 법령 원문
 수집 후 실제 조문과 대조해 확정한다.

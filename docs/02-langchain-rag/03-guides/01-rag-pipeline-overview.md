@@ -1,5 +1,7 @@
 # RAG 파이프라인 현재 구조
 
+- 작성일: 2026-07-09
+
 이 문서는 LangGraph로 넘어가기 전에 현재 RAG가 어디까지 구현되어 있는지 한 번
 정리하기 위한 메모다. 자세한 실험 수치보다, 코드를 읽을 때 길을 잃지 않는 것을
 목표로 한다.
@@ -52,7 +54,8 @@
 
 LangChain은 지금 단계에서 전체 구조를 대체하지 않는다. 기존에 만든 parser,
 retriever, generator 경계를 유지하고, `rag.py`에서 prompt → model → parser 흐름을
-작게 연결하는 데 사용한다.
+작게 연결하는 데 사용한다. 결정 배경은
+[`ADR 0007`](../01-adr/0007-integrate-langchain-with-minimal-lcel.md)에 기록한다.
 
 ### 왜 `StrOutputParser`를 쓰나
 

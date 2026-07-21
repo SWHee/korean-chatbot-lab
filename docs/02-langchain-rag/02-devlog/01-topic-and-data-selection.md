@@ -39,7 +39,7 @@ RAG를 구현하려면 먼저 답변할 주제와 근거 문서를 정해야 했
 - [`collect_laws.py`](../../../scripts/collect_laws.py): 현행 법령 검색과 XML 수집
 - [`data/laws/`](../../../data/laws): 2026-07-06 기준 원문 snapshot
 - [`statutes.py`](../../../src/chatbot/statutes.py): XML을 조문 단위 `Article`로 변환
-- [`rag-questions.md`](../../evaluation/rag-questions.md): 평가 질문 24개
+- [`RAG 평가 질문`](../../03-langsmith-evaluation/02-rag-questions.md): 평가 질문 24개
 
 정기 동기화는 구현하지 않았다. 현재 목표는 작은 고정 corpus로 RAG의 각 단계를
 학습하고 재현하는 것이다. 답변에는 snapshot의 시행일을 근거로 사용하고, 최신

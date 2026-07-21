@@ -60,7 +60,7 @@ Answer Relevancy는 답변이 질문을 직접 다뤘는지 보며, 사실이 �
 현재 Dataset은 `/ask-rag`와 같은 검색·생성 경로의 평가 함수와 연결되어 LangChain
 v1 기준선에 사용됐다. 일반 API의 `sources`에는 조문 본문이 없지만, 평가 함수는
 Faithfulness 확인을 위해 모델에 제공한 본문을 `retrieved_contexts`로 별도 보존한다.
-실행 결과는 [`langchain-baseline-results.md`](langchain-baseline-results.md)에서
+실행 결과는 [`LangChain v1 기준선 결과`](06-langchain-baseline-results.md)에서
 확인할 수 있다.
 
 ## A. 법령 근거형 (주력, 12개)

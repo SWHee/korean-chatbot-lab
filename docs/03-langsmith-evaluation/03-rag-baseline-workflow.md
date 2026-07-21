@@ -1,5 +1,7 @@
 # RAG 기준선 평가 순서
 
+- 작성일: 2026-07-14
+
 이 문서는 현재 LangChain RAG를 먼저 평가하고 LangGraph로 옮기는 순서를 정리한다.
 목표는 점수를 높게 만드는 것이 아니라, 실행 구조가 바뀌기 전과 후를 같은 기준으로
 비교하는 것이다.
@@ -23,7 +25,7 @@ LangGraph를 먼저 구현하면 답변 변화가 기존 RAG의 한계인지, �
 
 | 단계 | 산출물 | 상태 |
 | --- | --- | --- |
-| 평가 질문 확정 | `rag-questions.md` | 완료 |
+| 평가 질문 확정 | `02-rag-questions.md` | 완료 |
 | 로컬 Dataset 작성 | `data/evaluation/rag-v1-dev.jsonl` 24문항 | 완료 |
 | LangSmith Dataset 등록 | `korean-chatbot-rag-v1-dev` | 완료 |
 | 평가용 RAG 함수 연결 | `run_rag_evaluation()` | 완료 |
@@ -33,7 +35,7 @@ LangGraph를 먼저 구현하면 답변 변화가 기존 RAG의 한계인지, �
 | StateGraph 전환 | 같은 검색·생성 기능 이동 | 다음 단계 |
 
 기준선 결과와 문항별 해석은
-[`langchain-baseline-results.md`](langchain-baseline-results.md)에 기록한다.
+[`LangChain v1 기준선 결과`](06-langchain-baseline-results.md)에 기록한다.
 
 ## Dataset과 평가 범위
 
@@ -79,6 +81,9 @@ uv run python scripts/run_rag_evaluation.py --all
 보조 기록이다. 최종 기준선은 RAG 실행 24건과 평가 대상 15문항의 세 지표가 모두
 있는 단일 Experiment다.
 
+처음 실행에서 겪은 `No Feedback`과 API 한도 문제는
+[`첫 기준선 평가 문제 해결`](08-langchain-baseline-troubleshooting.md)에 정리한다.
+
 ## LangGraph 비교에서 고정할 조건
 
 첫 StateGraph 전환에서는 다음 값을 바꾸지 않는다.
@@ -103,7 +108,7 @@ uv run python scripts/run_rag_evaluation.py --all
 - 문항별 실패 원인과 현재 한계를 사람이 확인함
 
 현재 LangChain v1 기준선은 이 조건을 충족한다. 다음 작업은
-[`LangGraph 전환 계획`](../others/langgraph-migration-plan.md)의 첫 단계부터 작은
+[`LangGraph 전환 계획`](../04-langgraph-migration/01-langgraph-migration-plan.md)의 첫 단계부터 작은
 단위로 진행한다.
 
 참고:

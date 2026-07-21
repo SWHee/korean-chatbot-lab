@@ -1,7 +1,7 @@
 # 법령 원문 XML (RAG corpus)
 
 "예·적금 이용자를 위한 소비자보호 법령 Q&A"의 근거 문서 4건. 선정 배경과
-결정은 `docs/adr/0004-select-consumer-protection-laws-corpus.md` 참고.
+결정은 `docs/02-langchain-rag/01-adr/0004-select-consumer-protection-laws-corpus.md` 참고.
 
 ## 출처와 라이선스
 

@@ -1,5 +1,7 @@
 # LangSmith 추적과 평가 흐름
 
+- 작성일: 2026-07-09
+
 LangSmith는 현재 RAG가 어떤 순서로 실행됐는지 확인하고, 같은 Dataset으로 변경
 전후를 비교하는 데 사용한다. 이 프로젝트에서는 trace 확인과 Dataset 평가를
 순서대로 연결했다.
@@ -26,7 +28,8 @@ LangSmith에서는 입력 질문, prompt에 들어간 문맥, 생성 답변과 �
 로컬 `.env`에 다음 값을 둔다.
 
 ```text
-LANGSMITH_TRACING=true
+LANGSMITH_TRACING_V2=true
+LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
 LANGSMITH_API_KEY=<발급받은 키>
 LANGSMITH_PROJECT=korean-chatbot-rag-dev
 ```
@@ -96,9 +99,11 @@ LangChain v1은 단일 Experiment에서 24문항을 평가했다. 누락과 실�
 평가 대상 15문항의 검색 점수와 Faithfulness가 모두 존재하는 이 실행을 기준선으로
 사용한다. 앞선 분할 실행과 한도 실패 실행은 비교·트러블슈팅 기록으로 남긴다.
 
-결과는 [`langchain-baseline-results.md`](../evaluation/langchain-baseline-results.md),
+결과는 [`LangChain v1 기준선 결과`](06-langchain-baseline-results.md),
 연결 중 겪은 문제는
-[`langsmith-evaluation-troubleshooting.md`](langsmith-evaluation-troubleshooting.md)에
+[`LangSmith 화면 연결 문제 해결`](07-langsmith-connection-troubleshooting.md),
+평가 중 겪은 문제는
+[`LangChain 첫 기준선 평가 문제 해결`](08-langchain-baseline-troubleshooting.md)에
 분리해 기록한다.
 
 공식 문서:

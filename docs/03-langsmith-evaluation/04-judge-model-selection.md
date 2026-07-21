@@ -51,7 +51,7 @@ Judge는 세 필드만 반환한다.
 | `issues` | 문맥에 없거나 문맥과 모순되는 주장, 최대 3개 |
 
 세 단계 점수를 사용한 이유와 A1 판정 사례는
-[`faithfulness-scoring.md`](faithfulness-scoring.md)에 별도로 기록한다.
+[`Faithfulness 점수 해석`](05-faithfulness-scoring.md)에 별도로 기록한다.
 
 ## 실행 결과
 

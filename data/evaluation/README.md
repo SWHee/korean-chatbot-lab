@@ -26,7 +26,7 @@ RAG가 기존 Chroma 인덱스에서 어떤 조문을 찾고 어떤 답변을 �
 
 ## 데이터 출처
 
-- 질문: `docs/evaluation/rag-questions.md`에서 정리한 24개 질문
+- 질문: `docs/03-langsmith-evaluation/02-rag-questions.md`에서 정리한 24개 질문
 - 법령 근거: `data/laws/`의 2026-07-06 국가법령정보 Open API snapshot
 - 정답 조문과 기대 주장: 법령 XML 원문 대조 후 작성
 
