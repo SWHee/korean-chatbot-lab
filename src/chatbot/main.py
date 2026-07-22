@@ -11,8 +11,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from chatbot.embedding import load_encoder
+from chatbot.graph import create_rag_graph  # 그래프 생성 함수
 from chatbot.ollama_generator import OllamaGenerator
-from chatbot.rag import answer_question, stream_answer_question
+from chatbot.rag import stream_answer_question
 from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
@@ -47,10 +48,17 @@ def prepare_rag_resources(app: FastAPI) -> None:
         app.state.encoder = load_encoder()
     if not hasattr(app.state, "collection"):
         app.state.collection = open_collection()
+    if not hasattr(app.state, "rag_graph"):
+        app.state.rag_graph = create_rag_graph(
+            generator=app.state.generator,
+            encoder=app.state.encoder,
+            collection=app.state.collection,
+            top_k=DEFAULT_TOP_K,
+        )
 
 
 async def retrieve_rag_articles(request: Request, question: str) -> list[dict]:
-    """두 RAG endpoint가 공유하는 상위 법령 조문 검색"""
+    """스트리밍 RAG 답변에 사용할 상위 법령 조문 검색"""
     return await asyncio.to_thread(
         retrieve_articles,
         encoder=request.app.state.encoder,
@@ -75,7 +83,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         raise ValueError(f"unknown CHATBOT_BACKEND: {backend}")
     yield
-    for name in ("generator", "encoder", "collection"):
+    for name in ("generator", "encoder", "collection", "rag_graph"):
         if hasattr(app.state, name):
             delattr(app.state, name)
 
@@ -91,17 +99,16 @@ async def ask_rag(payload: RagRequest, request: Request) -> RagResponse:
     """법령 RAG로 질문에 답변하고 검색 근거 반환"""
     await asyncio.to_thread(prepare_rag_resources, request.app)
 
-    generator = request.app.state.generator
-
     started_at = perf_counter()
-    articles = await retrieve_rag_articles(request, payload.question)
-    response = await asyncio.to_thread(
-        answer_question,
-        generator=generator,
-        question=payload.question,
-        articles=articles,
+    graph_input = {"question": payload.question}
+    graph_result = await asyncio.to_thread(
+        request.app.state.rag_graph.invoke,
+        input=graph_input,
     )
     generation_seconds = perf_counter() - started_at
+
+    articles = graph_result["articles"]
+    response = graph_result["answer"]
 
     return RagResponse(
         response=response,
