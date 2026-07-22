@@ -12,7 +12,7 @@
 | 구분 | 현재 구현 |
 | --- | --- |
 | 생성 모델 | Qwen3-4B-Instruct-2507 · 기본 실행은 Ollama q4_K_M |
-| API | 일반 대화와 법령 RAG의 일반·스트리밍 요청 제공 |
+| API | 법령 RAG의 JSON·스트리밍 요청 제공 |
 | RAG 데이터 | 금융소비자보호법·예금자보호법과 각 시행령, 총 4건 |
 | 검색 | KURE-v1 임베딩(1024차원) · Chroma 벡터스토어 |
 | 평가 | LangSmith Dataset 24문항 · 검색 Precision/Recall · Gemini Faithfulness |
@@ -25,8 +25,7 @@ flowchart LR
     U[사용자 질문] --> UI[Streamlit 채팅 UI]
     UI --> API[FastAPI]
 
-    API --> C[/chat · /chat/stream/]
-    C --> G[Generator 경계]
+    G[Generator 경계]
     G --> O[Ollama Qwen3<br/>기본 backend]
     G -. 선택 .-> H[Hugging Face Qwen3]
 
@@ -41,14 +40,13 @@ flowchart LR
     P --> V
 ```
 
-일반 대화는 모델에 질문을 바로 전달합니다. 법령 RAG는 질문과 가까운 조문을 먼저
-찾아 모델에 함께 제공하므로, 답변과 함께 검색에 사용한 법령 출처를 확인할 수
-있습니다.
+법령 RAG는 질문과 가까운 조문을 먼저 찾아 모델에 함께 제공하므로, 답변과 함께
+검색에 사용한 법령 출처를 확인할 수 있습니다.
 
 ## 현재 완료한 범위
 
 - Qwen3 기반 로컬 생성기와 Ollama backend 전환
-- FastAPI 일반 응답·순수 텍스트 스트리밍 API
+- FastAPI 법령 RAG JSON·순수 텍스트 스트리밍 API
 - 법령 XML 수집, 조문 파싱, 조문 경계 기반 청킹
 - KURE-v1 모델 비교·선정과 Chroma 인덱스 생성
 - 질문 임베딩 → 조문 검색 → LCEL 답변 생성의 최소 RAG 흐름
@@ -122,18 +120,8 @@ uv run streamlit run streamlit_app.py
 
 | Endpoint | 역할 | 응답 방식 |
 | --- | --- | --- |
-| `POST /chat` | RAG 없이 모델에 바로 질문 | JSON |
-| `POST /chat/stream` | 일반 답변을 텍스트 조각으로 전송 | plain text stream |
 | `POST /ask-rag` | 법령 검색 후 답변과 출처 반환 | JSON |
 | `POST /ask-rag/stream` | 법령 검색 후 답변을 텍스트 조각으로 전송 | plain text stream |
-
-일반 대화 요청:
-
-```bash
-curl -X POST http://127.0.0.1:8000/chat \
-  -H "Content-Type: application/json" \
-  -d '{"prompt":"예금자보호제도가 무엇인가요?"}'
-```
 
 법령 RAG 요청:
 

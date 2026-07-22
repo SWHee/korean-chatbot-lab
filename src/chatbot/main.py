@@ -1,7 +1,6 @@
 """FastAPI 챗봇 API와 생성 backend 수명주기"""
 
 import asyncio
-import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -17,22 +16,6 @@ from chatbot.rag import answer_question, stream_answer_question
 from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
-
-
-logger = logging.getLogger("uvicorn.error")
-
-
-class ChatRequest(BaseModel):
-    """챗봇에 전달할 사용자 질문 검증"""
-
-    prompt: str = Field(min_length=1)
-
-
-class ChatResponse(BaseModel):
-    """챗봇이 생성한 답변 형식 정의"""
-
-    response: str
-    generation_seconds: float
 
 
 class RagRequest(BaseModel):
@@ -101,33 +84,6 @@ app = FastAPI(
     title="Korean Chatbot",
     lifespan=lifespan,
 )
-
-
-@app.post("/chat", response_model=ChatResponse)
-async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
-    """사용자 질문을 로컬 모델에 전달해 답변 반환"""
-    generator = request.app.state.generator
-
-    # 동기식 모델 추론을 별도 thread에서 실행
-    started_at = perf_counter()
-    response = await asyncio.to_thread(generator.generate, payload.prompt)
-    generation_seconds = perf_counter() - started_at
-    logger.info("generation_seconds=%.3f", generation_seconds)
-
-    return ChatResponse(
-        response=response,
-        generation_seconds=generation_seconds,
-    )
-
-
-@app.post("/chat/stream", response_class=StreamingResponse)
-async def chat_stream(payload: ChatRequest, request: Request) -> StreamingResponse:
-    """사용자 질문에 대한 답변을 조각별로 전송"""
-    generator = request.app.state.generator
-    return StreamingResponse(
-        generator.stream(payload.prompt),
-        media_type="text/plain; charset=utf-8",
-    )
 
 
 @app.post("/ask-rag", response_model=RagResponse)
