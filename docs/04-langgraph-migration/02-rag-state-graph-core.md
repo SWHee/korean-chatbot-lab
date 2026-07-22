@@ -46,9 +46,9 @@ START → retrieve → generate → END
 실제 KURE-v1, Chroma, Ollama는 이 테스트에서 적재하지 않습니다. 이 단계의 목적은
 모델 품질이 아니라 Graph의 상태 전달과 Node 실행 순서를 검증하는 것입니다.
 
-## 아직 연결하지 않은 부분
+## 다음 확인과 연결
 
-- FastAPI `/ask-rag`
+- FastAPI `/ask-rag` 실제 요청 확인
 - `/ask-rag/stream` 토큰 스트리밍
 - LangSmith 평가 target
 - Finlife API와 조건 분기

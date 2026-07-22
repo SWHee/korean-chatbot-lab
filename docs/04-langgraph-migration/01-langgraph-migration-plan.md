@@ -64,11 +64,11 @@ LCEL prompt와 Generator 경계는 그대로 재사용한다. LangGraph 안에�
 
 생성 문장은 실행마다 달라질 수 있으므로 문자열 완전 일치를 요구하지 않는다.
 
-### 4. FastAPI 비교 경로
+### 4. FastAPI 연결
 
-graph 실행이 확인된 뒤에만 비교용 endpoint를 하나 추가한다. 기존 `/ask-rag`는
-LangChain v1 기준으로 유지해 두고, 임시 graph 경로에서 같은 요청·응답 형식을
-사용한다. 비교가 끝난 뒤 어느 경로를 기본으로 둘지 결정한다.
+graph 실행이 확인된 뒤 기존 `/ask-rag`가 같은 요청·응답 형식으로 Graph를 실행하도록
+연결한다. LangChain v1 기준선은 별도 endpoint가 아니라 Git 기록과 LangSmith
+Experiment에 보존한다.
 
 ### 5. 같은 Dataset 재평가
 
