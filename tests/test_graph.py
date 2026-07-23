@@ -55,3 +55,34 @@ def test_rag_graph_retrieves_articles_before_generating_answer(monkeypatch) -> N
         "articles": articles,
         "answer": "예금자 1인당 1억원까지 보호됩니다.",
     }
+
+
+def test_rag_graph_streams_answer_chunks(monkeypatch) -> None:
+    """생성 Node의 답변 조각을 Graph custom stream으로 전달"""
+    question = "예금은 얼마까지 보호되나요?"
+    articles = [{"article_no": "제18조"}]
+
+    monkeypatch.setattr(
+        graph_module,
+        "retrieve_articles",
+        lambda **kwargs: articles,
+    )
+    monkeypatch.setattr(
+        graph_module,
+        "stream_answer_question",
+        lambda **kwargs: iter(["예금은 ", "1억원까지 보호됩니다."]),
+    )
+
+    graph = graph_module.create_rag_graph(
+        generator=object(),
+        encoder=object(),
+        collection=object(),
+    )
+    chunks = list(
+        graph.stream(
+            {"question": question, "streaming": True},
+            stream_mode="custom",
+        )
+    )
+
+    assert chunks == ["예금은 ", "1억원까지 보호됩니다."]

@@ -13,8 +13,7 @@ from pydantic import BaseModel, Field
 from chatbot.embedding import load_encoder
 from chatbot.graph import create_rag_graph  # 그래프 생성 함수
 from chatbot.ollama_generator import OllamaGenerator
-from chatbot.rag import stream_answer_question
-from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
+from chatbot.retriever import DEFAULT_TOP_K
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
 
@@ -55,17 +54,6 @@ def prepare_rag_resources(app: FastAPI) -> None:
             collection=app.state.collection,
             top_k=DEFAULT_TOP_K,
         )
-
-
-async def retrieve_rag_articles(request: Request, question: str) -> list[dict]:
-    """스트리밍 RAG 답변에 사용할 상위 법령 조문 검색"""
-    return await asyncio.to_thread(
-        retrieve_articles,
-        encoder=request.app.state.encoder,
-        collection=request.app.state.collection,
-        question=question,
-        top_k=DEFAULT_TOP_K,
-    )
 
 
 @asynccontextmanager
@@ -132,14 +120,15 @@ async def ask_rag_stream(
     """법령 RAG 답변 조각을 순수 텍스트로 전송"""
     await asyncio.to_thread(prepare_rag_resources, request.app)
 
-    generator = request.app.state.generator
-    articles = await retrieve_rag_articles(request, payload.question)
+    graph_input = {
+        "question": payload.question,
+        "streaming": True,  # 그래프 노드에서 스트리밍 모드 활성화
+    }
 
     return StreamingResponse(
-        stream_answer_question(
-            generator=generator,
-            question=payload.question,
-            articles=articles,
+        request.app.state.rag_graph.stream(
+            input=graph_input,
+            stream_mode="custom",
         ),
         media_type="text/plain; charset=utf-8",
     )
