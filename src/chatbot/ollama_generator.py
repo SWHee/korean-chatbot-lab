@@ -8,7 +8,7 @@ import httpx
 
 MODEL_ID = "qwen3:4b-instruct-2507-q4_K_M"
 BASE_URL = "http://localhost:11434"
-MAX_NEW_TOKENS = 1024
+MAX_NEW_TOKENS = 1024  # Ollama backend 생성 길이 상한
 TIMEOUT_SECONDS = 60.0
 
 
@@ -21,7 +21,6 @@ class OllamaGenerator:
             "model": MODEL_ID,
             "messages": [{"role": "user", "content": prompt}],
             "stream": stream,
-            # Ollama backend의 생성 길이 상한
             "options": {"num_predict": MAX_NEW_TOKENS},
         }
 

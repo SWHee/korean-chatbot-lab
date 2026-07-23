@@ -1,4 +1,4 @@
-"""LangSmith에서 현재 법령 RAG의 한 문항 experiment 실행"""
+"""LangSmith에서 LangGraph 법령 RAG experiment 실행"""
 
 import argparse
 from collections.abc import Callable
@@ -11,22 +11,23 @@ from chatbot.evaluation import (
     CORPUS_SNAPSHOT,
     DATASET_NAME,
     DATASET_VERSION,
-    run_rag_evaluation,
 )
 from chatbot.evaluators import (
     JUDGE_MODEL_NAME,
     create_faithfulness_evaluator,
     langsmith_retrieval_evaluator,
 )
+from chatbot.graph import create_rag_graph
 from chatbot.ollama_generator import OllamaGenerator
+from chatbot.rag import format_context
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_QUESTION_ID = "A1"
-BATCH_EXPERIMENT_PREFIX = "rag-v1-batch"
-FULL_EXPERIMENT_PREFIX = "rag-v1-baseline"
+BATCH_EXPERIMENT_PREFIX = "rag-graph-v1-batch"
+FULL_EXPERIMENT_PREFIX = "rag-graph-v1-baseline"
 
 
 def find_dataset_example(client: Client, question_id: str):
@@ -45,16 +46,30 @@ def find_dataset_example(client: Client, question_id: str):
     return examples[0]
 
 
-def create_evaluation_target(generator, encoder, collection) -> Callable:
-    """현재 RAG 자원을 LangSmith가 호출할 평가 함수로 연결"""
+def create_graph_evaluation_target(rag_graph) -> Callable:
+    """LangGraph 실행 결과를 LangSmith 평가 출력으로 변환"""
 
     def target(inputs: dict[str, str]) -> dict[str, object]:
-        return run_rag_evaluation(
-            inputs,
-            generator=generator,
-            encoder=encoder,
-            collection=collection,
-        )
+        graph_result = rag_graph.invoke({"question": inputs["question"]})
+        answer = graph_result["answer"]
+        articles = graph_result["articles"]
+
+        sources = [
+            {
+                "law_name": article["law_name"],
+                "article_no": article["article_no"],
+                "effective_date": article["effective_date"],
+                "similarity": article["similarity"],
+            }
+            for article in articles
+        ]
+        retrieved_contexts = [format_context([article]) for article in articles]
+
+        return {
+            "answer": answer,
+            "sources": sources,
+            "retrieved_contexts": retrieved_contexts,
+        }
 
     return target
 
@@ -77,6 +92,7 @@ def run_selected_questions_experiment(
             "corpus_snapshot": CORPUS_SNAPSHOT,
             "question_ids": question_ids,
             "judge_model": JUDGE_MODEL_NAME,
+            "pipeline": "langgraph-v1",
         },
         experiment_prefix=BATCH_EXPERIMENT_PREFIX,
         max_concurrency=1,
@@ -99,6 +115,7 @@ def run_full_dataset_experiment(
             "dataset": DATASET_VERSION,
             "corpus_snapshot": CORPUS_SNAPSHOT,
             "judge_model": JUDGE_MODEL_NAME,
+            "pipeline": "langgraph-v1",
         },
         experiment_prefix=FULL_EXPERIMENT_PREFIX,
         max_concurrency=1,
@@ -124,7 +141,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
-    """로컬 RAG 자원 준비 후 한 문항 experiment 실행"""
+    """로컬 RAG 그래프 준비 후 선택 문항 또는 전체 Dataset 실행"""
     args = parse_args()
     load_local_env(PROJECT_ROOT / ".env")
     client = Client()
@@ -138,11 +155,16 @@ def main() -> None:
             find_dataset_example(client, question_id) for question_id in question_ids
         ]
 
-    target = create_evaluation_target(
-        generator=OllamaGenerator(),
-        encoder=load_encoder(),
-        collection=open_collection(),
+    generator = OllamaGenerator()
+    encoder = load_encoder()
+    collection = open_collection()
+    rag_graph = create_rag_graph(
+        generator=generator,
+        encoder=encoder,
+        collection=collection,
     )
+    target = create_graph_evaluation_target(rag_graph)
+
     if args.all:
         results = run_full_dataset_experiment(
             client=client,

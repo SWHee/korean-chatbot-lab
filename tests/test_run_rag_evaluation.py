@@ -11,6 +11,7 @@ SCRIPT = run_path(
     Path(__file__).resolve().parent.parent / "scripts" / "run_rag_evaluation.py"
 )
 DATASET_NAME = SCRIPT["DATASET_NAME"]
+create_graph_evaluation_target = SCRIPT["create_graph_evaluation_target"]
 find_dataset_example = SCRIPT["find_dataset_example"]
 run_full_dataset_experiment = SCRIPT["run_full_dataset_experiment"]
 run_selected_questions_experiment = SCRIPT["run_selected_questions_experiment"]
@@ -26,6 +27,53 @@ class FakeClient:
     def list_examples(self, **kwargs):
         self.list_examples_kwargs = kwargs
         return iter(self.examples)
+
+
+class FakeRagGraph:
+    """질문 입력과 고정 graph state 반환"""
+
+    def __init__(self, result: dict) -> None:
+        self.result = result
+        self.received_state = None
+
+    def invoke(self, state: dict) -> dict:
+        self.received_state = state
+        return self.result
+
+
+def test_create_graph_evaluation_target_formats_graph_result() -> None:
+    """그래프 상태를 기존 LangSmith evaluator 출력 계약으로 변환"""
+    article = {
+        "law_name": "예금자보호법",
+        "article_no": "제32조",
+        "effective_date": "20260102",
+        "similarity": 0.9,
+        "text": "보험금의 계산 기준",
+    }
+    graph = FakeRagGraph(
+        {
+            "question": "예금은 얼마까지 보호되나요?",
+            "articles": [article],
+            "answer": "법령 근거에 따른 답변",
+        }
+    )
+    target = create_graph_evaluation_target(graph)
+
+    result = target({"question": "예금은 얼마까지 보호되나요?"})
+
+    assert graph.received_state == {"question": "예금은 얼마까지 보호되나요?"}
+    assert result["answer"] == "법령 근거에 따른 답변"
+    assert result["sources"] == [
+        {
+            "law_name": "예금자보호법",
+            "article_no": "제32조",
+            "effective_date": "20260102",
+            "similarity": 0.9,
+        }
+    ]
+    assert result["retrieved_contexts"] == [
+        "출처: 예금자보호법 제32조 (시행일: 20260102)\n보험금의 계산 기준"
+    ]
 
 
 def test_find_dataset_example_filters_by_question_id() -> None:
@@ -76,6 +124,7 @@ def test_run_selected_questions_experiment_uses_one_worker() -> None:
     assert captured["max_concurrency"] == 1
     assert captured["client"] is client
     assert captured["metadata"]["question_ids"] == ["A1", "A2"]
+    assert captured["metadata"]["pipeline"] == "langgraph-v1"
     assert captured["evaluators"][1] == "faithfulness-evaluator"
     assert len(captured["evaluators"]) == 2
 
@@ -104,5 +153,6 @@ def test_run_full_dataset_experiment_uses_registered_dataset() -> None:
     assert captured["max_concurrency"] == 1
     assert captured["client"] is client
     assert "question_id" not in captured["metadata"]
+    assert captured["metadata"]["pipeline"] == "langgraph-v1"
     assert captured["evaluators"][1] == "faithfulness-evaluator"
     assert len(captured["evaluators"]) == 2

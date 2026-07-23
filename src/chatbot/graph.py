@@ -18,15 +18,13 @@ class RagState(TypedDict):
     streaming: NotRequired[bool]
 
 
-# 기존 RAG 자원을 노드에 연결한 그래프 생성
 def create_rag_graph(
     generator,
     encoder,
     collection,
     top_k: int = DEFAULT_TOP_K,
 ):
-    """기존 검색과 생성을 연결한 법령 RAG 그래프"""
-
+    # 기존 검색과 생성을 연결한 법령 RAG 그래프
     def retrieve_node(state: RagState) -> dict:
         articles = retrieve_articles(
             encoder=encoder,
