@@ -56,6 +56,20 @@ def create_rag_graph(
         )
         return {"answer": answer}
 
+
+    # def search_law_articles(question: str) -> RagState:
+    #     # 법령 RAG 그래프를 실행하는 함수
+    #     initial_state: RagState = {"question": question}
+    #     final_state = builder.run(initial_state)
+    #     return final_state
+
+
+    # def search_financial_products(question: str) -> RagState:
+    #     # 금융상품 RAG 그래프를 실행하는 함수
+    #     initial_state: RagState = {"question": question}
+    #     final_state = builder.run(initial_state)
+    #     return final_state
+
     builder = StateGraph(RagState)
 
     builder.add_node("retrieve", retrieve_node)
@@ -64,5 +78,9 @@ def create_rag_graph(
     builder.add_edge(START, "retrieve")
     builder.add_edge("retrieve", "generate")
     builder.add_edge("generate", END)
+
+    # [Graph Visualization] 그래프를 시각화하고 싶다면 아래 주석을 해제하세요.
+    # mermaid_text = builder.get_graph().draw_mermaid()
+    # print(mermaid_text)
 
     return builder.compile()
