@@ -3,11 +3,13 @@
 from types import SimpleNamespace
 
 import pytest
+from google.genai.errors import ServerError
 from pydantic import ValidationError
 
 from chatbot.evaluators import (
     JudgeResult,
     build_faithfulness_feedback,
+    evaluate_faithfulness_run,
     evaluate_retrieval_run,
     score_article_retrieval_top_5,
 )
@@ -61,6 +63,135 @@ def test_build_faithfulness_feedback_keeps_issues_in_extra() -> None:
             "issues": ["이자 제외 주장이 검색 문맥과 모순됩니다."],
         },
     }
+
+
+def test_evaluate_faithfulness_run_marks_judge_503_for_retry() -> None:
+    """Judge 과부하를 점수와 구분되는 재평가 대상으로 기록"""
+
+    class UnavailableJudge:
+        def invoke(self, inputs):
+            raise ServerError(
+                503,
+                {
+                    "error": {
+                        "code": 503,
+                        "message": "The model is overloaded.",
+                        "status": "UNAVAILABLE",
+                    }
+                },
+            )
+
+    run = SimpleNamespace(
+        inputs={"question": "예금은 얼마까지 보호되나요?"},
+        outputs={
+            "retrieved_contexts": ["보험금의 한도는 1억원이다."],
+            "answer": "예금은 1억원까지 보호됩니다.",
+        },
+    )
+    example = SimpleNamespace(
+        metadata={
+            "rubric": {
+                "metric_eligibility": {"faithfulness": True},
+            }
+        }
+    )
+
+    feedback = evaluate_faithfulness_run(
+        run=run,
+        example=example,
+        judge_chain=UnavailableJudge(),
+    )
+
+    assert feedback["score"] is None
+    assert "채점을 보류" in feedback["comment"]
+    assert feedback["extra"] == {
+        "error_type": "ServerError",
+        "status_code": 503,
+        "retryable": True,
+    }
+
+
+def test_evaluate_faithfulness_run_returns_judge_feedback() -> None:
+    """정상 Judge 결과를 기존 Faithfulness feedback으로 변환"""
+
+    class SuccessfulJudge:
+        def invoke(self, inputs):
+            assert inputs == {
+                "question": "예금은 얼마까지 보호되나요?",
+                "contexts": "보험금의 한도는 1억원이다.",
+                "answer": "예금은 1억원까지 보호됩니다.",
+            }
+            return JudgeResult(
+                score=1.0,
+                reason="답변의 금액이 검색 문맥으로 뒷받침됩니다.",
+                issues=[],
+            )
+
+    run = SimpleNamespace(
+        inputs={"question": "예금은 얼마까지 보호되나요?"},
+        outputs={
+            "retrieved_contexts": ["보험금의 한도는 1억원이다."],
+            "answer": "예금은 1억원까지 보호됩니다.",
+        },
+    )
+    example = SimpleNamespace(
+        metadata={
+            "rubric": {
+                "metric_eligibility": {"faithfulness": True},
+            }
+        }
+    )
+
+    feedback = evaluate_faithfulness_run(
+        run=run,
+        example=example,
+        judge_chain=SuccessfulJudge(),
+    )
+
+    assert feedback == {
+        "key": "faithfulness",
+        "score": 1.0,
+        "comment": "답변의 금액이 검색 문맥으로 뒷받침됩니다.",
+        "extra": {"issues": []},
+    }
+
+
+def test_evaluate_faithfulness_run_keeps_non_503_error_visible() -> None:
+    """과부하가 아닌 Judge 서버 오류를 숨기지 않음"""
+
+    class BrokenJudge:
+        def invoke(self, inputs):
+            raise ServerError(
+                500,
+                {
+                    "error": {
+                        "code": 500,
+                        "message": "Internal error.",
+                        "status": "INTERNAL",
+                    }
+                },
+            )
+
+    run = SimpleNamespace(
+        inputs={"question": "질문"},
+        outputs={"retrieved_contexts": ["문맥"], "answer": "답변"},
+    )
+    example = SimpleNamespace(
+        metadata={
+            "rubric": {
+                "metric_eligibility": {"faithfulness": True},
+            }
+        }
+    )
+
+    with pytest.raises(ServerError) as error:
+        evaluate_faithfulness_run(
+            run=run,
+            example=example,
+            judge_chain=BrokenJudge(),
+        )
+
+    assert error.value.code == 500
 
 
 def test_score_article_retrieval_top_5_uses_required_and_supporting_articles() -> None:

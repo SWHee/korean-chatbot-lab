@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from google.genai.errors import ServerError
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langsmith.evaluation import run_evaluator
@@ -11,6 +12,8 @@ from pydantic import BaseModel, Field
 
 EVALUATION_TOP_K = 5
 JUDGE_MODEL_NAME = "gemini-3.5-flash"
+JUDGE_MODEL_MAX_RETRIES = 2
+JUDGE_CHAIN_MAX_ATTEMPTS = 2
 
 
 class JudgeResult(BaseModel):
@@ -79,24 +82,48 @@ def create_faithfulness_evaluator():
         temperature=0,
         thinking_level="minimal",
         max_tokens=512,
+        max_retries=JUDGE_MODEL_MAX_RETRIES,
     )
-    judge_chain = FAITHFULNESS_PROMPT | judge_model.with_structured_output(JudgeResult)
+    judge_chain = (
+        FAITHFULNESS_PROMPT
+        | judge_model.with_structured_output(JudgeResult)
+    ).with_retry(
+        retry_if_exception_type=(ServerError,),
+        wait_exponential_jitter=True,
+        stop_after_attempt=JUDGE_CHAIN_MAX_ATTEMPTS,
+    )
 
     @run_evaluator
     def evaluate_faithfulness(run: Run, example: Example | None) -> dict:
-        if example is None:
-            raise ValueError("충실도 평가에는 Dataset example이 필요합니다.")
+        return evaluate_faithfulness_run(
+            run=run,
+            example=example,
+            judge_chain=judge_chain,
+        )
 
-        rubric = (example.metadata or {}).get("rubric", {})
-        metric_eligibility = rubric.get("metric_eligibility", {})
-        if not metric_eligibility.get("faithfulness", False):
-            return {
-                "key": "faithfulness",
-                "score": None,
-                "comment": "현재 평가 기준에서 충실도 평가 대상이 아닌 문항",
-            }
+    return evaluate_faithfulness
 
-        outputs = run.outputs or {}
+
+def evaluate_faithfulness_run(
+    run: Run,
+    example: Example | None,
+    judge_chain,
+) -> dict:
+    """평가 대상 확인과 일시적인 Judge 과부하 처리"""
+    if example is None:
+        raise ValueError("충실도 평가에는 Dataset example이 필요합니다.")
+
+    rubric = (example.metadata or {}).get("rubric", {})
+    metric_eligibility = rubric.get("metric_eligibility", {})
+    if not metric_eligibility.get("faithfulness", False):
+        return {
+            "key": "faithfulness",
+            "score": None,
+            "comment": "현재 평가 기준에서 충실도 평가 대상이 아닌 문항",
+        }
+
+    outputs = run.outputs or {}
+    try:
         result = judge_chain.invoke(
             {
                 "question": (run.inputs or {})["question"],
@@ -104,9 +131,24 @@ def create_faithfulness_evaluator():
                 "answer": outputs["answer"],
             }
         )
-        return build_faithfulness_feedback(result)
+    except ServerError as error:
+        if error.code != 503:
+            raise
+        return {
+            "key": "faithfulness",
+            "score": None,
+            "comment": (
+                "Gemini Judge가 일시적인 과부하(503)로 응답하지 않아 "
+                "채점을 보류했습니다. 이 문항은 다시 평가해야 합니다."
+            ),
+            "extra": {
+                "error_type": type(error).__name__,
+                "status_code": error.code,
+                "retryable": True,
+            },
+        }
 
-    return evaluate_faithfulness
+    return build_faithfulness_feedback(result)
 
 
 def build_faithfulness_feedback(result: JudgeResult) -> dict:

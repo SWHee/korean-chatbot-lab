@@ -75,6 +75,36 @@ evaluator trace에는 `429 RESOURCE_EXHAUSTED`가 표시됐다.
 - 같은 15문항의 Faithfulness 존재
 - 평가 제외 9문항의 No Feedback이 Dataset 설정과 일치
 
+## Faithfulness의 `Evaluator run failed`
+
+### 증상
+
+2026-07-27 전체 평가 중 일부 Faithfulness trace에 `Evaluator run failed`와
+`503 UNAVAILABLE`이 표시됐다. 같은 실행의 Precision과 Recall은 정상적으로
+계산됐다.
+
+### 원인과 구분
+
+확인한 오류 메시지는 Gemini Judge 모델의 일시적인 높은 요청량이었다. RAG 답변 생성,
+검색, Faithfulness 판정 로직이나 구조화 출력 parser가 실패한 것은 아니다.
+
+| 표시 | 의미 |
+| --- | --- |
+| 평가 제외 문항의 점수 없음 | Dataset 기준에 따른 정상 `N/A` |
+| `503 UNAVAILABLE` | Judge 서비스가 일시적으로 채점하지 못함 |
+| schema·입력 Key 오류 | 평가 코드 수정이 필요한 실패 |
+
+### 처리
+
+Judge SDK의 재시도 횟수를 명시하고, 그 재시도가 끝난 `ServerError`를 지수 간격으로
+한 번 더 재시도한다. 그래도 503이면 임의 점수를 만들지 않고 `score=None`과
+`재평가 필요` 설명을 Feedback에 남긴다. 503이 아닌 서버 오류와 코드 오류는 원인을
+숨기지 않도록 다시 발생시킨다.
+
+이 처리는 평가 결과의 누락을 점수로 바꾸는 방법이 아니다. 일시 장애와 평가 대상
+제외를 기록으로 구분하고, 최종 비교에 사용할 Experiment에서는 평가 대상 문항을
+다시 채점하기 위한 장치다.
+
 ## 다음 평가 전 확인 순서
 
 1. Ollama와 로컬 인덱스가 준비됐는지 확인
@@ -91,3 +121,5 @@ evaluator trace에는 `429 RESOURCE_EXHAUSTED`가 표시됐다.
 참고:
 
 - [Gemini API rate limits](https://ai.google.dev/gemini-api/docs/rate-limits)
+- [Gemini API 오류 해결 가이드](https://ai.google.dev/gemini-api/docs/troubleshooting)
+- [LangChain Google Generative AI 통합](https://docs.langchain.com/oss/python/integrations/chat/google_generative_ai)
