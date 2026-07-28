@@ -72,7 +72,8 @@ def test_create_graph_evaluation_target_formats_graph_result() -> None:
         }
     ]
     assert result["retrieved_contexts"] == [
-        "출처: 예금자보호법 제32조 (시행일: 20260102)\n보험금의 계산 기준"
+        "[S1] 출처: 예금자보호법 제32조 (시행일: 20260102)\n"
+        "보험금의 계산 기준"
     ]
 
 

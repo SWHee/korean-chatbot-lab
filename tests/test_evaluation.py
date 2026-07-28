@@ -78,7 +78,7 @@ def test_run_rag_evaluation_returns_answer_sources_and_contexts(monkeypatch) -> 
             }
         ],
         "retrieved_contexts": [
-            "출처: 예금자보호법 시행령 제18조 (시행일: 20250901)\n"
+            "[S1] 출처: 예금자보호법 시행령 제18조 (시행일: 20250901)\n"
             "보험금 지급한도는 1억원"
         ],
     }

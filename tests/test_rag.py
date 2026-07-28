@@ -4,19 +4,48 @@ import chatbot.rag as rag_module
 
 
 class FakeGenerator:
-    """전달받은 prompt를 기록하는 테스트 생성기"""
+    """전달받은 chat messages를 기록하는 테스트 생성기"""
 
-    def __init__(self) -> None:
-        self.prompts: list[str] = []
+    def __init__(self, response: rag_module.RagAnswer | None = None) -> None:
+        self.messages: list[list[dict[str, str]]] = []
+        self.response = response or rag_module.RagAnswer(
+            can_answer=True,
+            answer="예금은 관련 법령에 따라 보호됩니다.",
+            source_ids=["S1"],
+        )
 
-    def generate(self, prompt: str) -> str:
-        self.prompts.append(prompt)
-        return "예금은 관련 법령에 따라 보호됩니다."
+    def generate_structured(self, *, messages, response_model):
+        self.messages.append(messages)
+        assert response_model is rag_module.RagAnswer
+        return self.response
 
-    def stream(self, prompt: str):
-        self.prompts.append(prompt)
-        yield "예금은 "
-        yield "1억원까지 보호됩니다."
+    def stream_structured(self, *, messages, response_model):
+        self.messages.append(messages)
+        assert response_model is rag_module.RagStreamEnvelope
+        if self.response.can_answer:
+            midpoint = max(1, len(self.response.answer) // 2)
+            for answer in (
+                self.response.answer[:midpoint],
+                self.response.answer,
+            ):
+                yield {
+                    "result": [
+                        True,
+                        self.response.source_ids,
+                        answer,
+                    ]
+                }
+        else:
+            yield {
+                "result": [False, [], ""],
+            }
+        return rag_module.RagStreamEnvelope(
+            result=(
+                self.response.can_answer,
+                self.response.source_ids,
+                self.response.answer,
+            )
+        )
 
 
 def test_format_context_includes_source_and_text() -> None:
@@ -39,9 +68,9 @@ def test_format_context_includes_source_and_text() -> None:
     context = rag_module.format_context(articles)
 
     assert context == (
-        "출처: 예금자보호법 시행령 제18조 (시행일: 20250901)\n"
+        "[S1] 출처: 예금자보호법 시행령 제18조 (시행일: 20250901)\n"
         "보험금 한도는 1억원\n\n"
-        "출처: 예금자보호법 제32조 (시행일: 20260102)\n"
+        "[S2] 출처: 예금자보호법 제32조 (시행일: 20260102)\n"
         "보험금 지급 기준"
     )
 
@@ -64,10 +93,15 @@ def test_build_rag_inputs_combines_question_and_articles() -> None:
     assert inputs == {
         "question": "예금은 얼마까지 보호되나요?",
         "context": (
-            "출처: 예금자보호법 시행령 제18조 (시행일: 20250901)\n"
+            "[S1] 출처: 예금자보호법 시행령 제18조 (시행일: 20250901)\n"
             "보험금 한도는 1억원"
         ),
     }
+
+
+def test_format_context_marks_missing_evidence() -> None:
+    """검색 조문이 없음을 모델 입력에 명시"""
+    assert rag_module.format_context([]) == "검색된 법령 근거 없음"
 
 
 def test_rag_prompt_formats_question_and_context() -> None:
@@ -79,16 +113,23 @@ def test_rag_prompt_formats_question_and_context() -> None:
         }
     )
     messages = prompt_value.to_messages()
+    system_message = messages[0].content
 
-    assert "제공된 법령 근거만 사용" in messages[0].content
+    assert "제공된 법령 근거만 사용" in system_message
+    assert "can_answer" in system_message
+    assert "친절한 한국어 존댓말" in system_message
+    assert "같은 내용은 반복하지 마세요" in system_message
+    assert "제공된 [S번호]만" in system_message
+    assert "근거에 없는 내용을 추측" in system_message
+    assert "개별 상품의 보호 여부" in system_message
     assert messages[1].content == (
         "질문:\n예금은 얼마까지 보호되나요?\n\n"
         "법령 근거:\n출처: 예금자보호법 시행령 제18조\n보험금 한도는 1억원"
     )
 
 
-def test_model_runnable_passes_rendered_prompt_to_generator() -> None:
-    """LangChain prompt를 기존 Generator 입력 문자열로 연결"""
+def test_model_runnable_passes_chat_roles_to_generator() -> None:
+    """LangChain system·human 역할을 구조화 Generator에 전달"""
     generator = FakeGenerator()
     model = rag_module.create_model_runnable(generator)
     prompt_value = rag_module.RAG_PROMPT.invoke(
@@ -98,41 +139,32 @@ def test_model_runnable_passes_rendered_prompt_to_generator() -> None:
         }
     )
 
-    answer = model.invoke(prompt_value)
+    result = model.invoke(prompt_value)
 
-    assert answer == "예금은 관련 법령에 따라 보호됩니다."
-    assert "예금은 얼마까지 보호되나요?" in generator.prompts[0]
-    assert "보험금 한도는 1억원" in generator.prompts[0]
-
-
-def test_output_parser_returns_answer_text() -> None:
-    """Generator 출력 문자열을 최종 답변 문자열로 변환"""
-    answer = rag_module.OUTPUT_PARSER.invoke(
-        "예금은 관련 법령에 따라 보호됩니다."
-    )
-
-    assert answer == "예금은 관련 법령에 따라 보호됩니다."
+    assert result == generator.response
+    assert generator.messages[0][0]["role"] == "system"
+    assert generator.messages[0][1]["role"] == "user"
+    assert "예금은 얼마까지 보호되나요?" in generator.messages[0][1]["content"]
+    assert "보험금 한도는 1억원" in generator.messages[0][1]["content"]
 
 
-def test_rag_chain_connects_prompt_model_and_parser() -> None:
-    """prompt·model·parser를 하나의 LCEL 체인으로 연결"""
+def test_rag_chain_returns_structured_answer() -> None:
+    """prompt와 model을 구조화 응답 LCEL 체인으로 연결"""
     generator = FakeGenerator()
     chain = rag_module.create_rag_chain(generator)
 
-    answer = chain.invoke(
+    result = chain.invoke(
         {
             "question": "예금은 얼마까지 보호되나요?",
             "context": "예금자보호법 시행령 제18조: 보험금 한도는 1억원",
         }
     )
 
-    assert answer == "예금은 관련 법령에 따라 보호됩니다."
-    assert "예금은 얼마까지 보호되나요?" in generator.prompts[0]
-    assert "보험금 한도는 1억원" in generator.prompts[0]
+    assert result == generator.response
 
 
-def test_answer_question_invokes_chain_with_articles() -> None:
-    """검색 조문 목록으로 RAG 답변 생성"""
+def test_answer_question_renders_answer_and_validated_source() -> None:
+    """구조화 답변을 상담 문장과 실제 법령 출처로 렌더링"""
     generator = FakeGenerator()
     articles = [
         {
@@ -147,9 +179,48 @@ def test_answer_question_invokes_chain_with_articles() -> None:
         generator, "예금은 얼마까지 보호되나요?", articles
     )
 
-    assert answer == "예금은 관련 법령에 따라 보호됩니다."
-    assert "예금은 얼마까지 보호되나요?" in generator.prompts[0]
-    assert "예금자보호법 시행령 제18조" in generator.prompts[0]
+    assert answer == (
+        "예금은 관련 법령에 따라 보호됩니다.\n\n"
+        "확인한 법령 근거\n"
+        "- 예금자보호법 시행령 제18조 (시행일: 20250901)"
+    )
+    assert "예금은 얼마까지 보호되나요?" in generator.messages[0][1]["content"]
+    assert "예금자보호법 시행령 제18조" in generator.messages[0][1]["content"]
+
+
+def test_answer_question_uses_fixed_message_when_evidence_is_insufficient() -> None:
+    """근거 부족 상태에서는 모델 문장 대신 고정 안내 반환"""
+    generator = FakeGenerator(
+        rag_module.RagAnswer(
+            can_answer=False,
+            answer="이 상품에 가입하셔도 됩니다.",
+            source_ids=[],
+        )
+    )
+
+    answer = rag_module.answer_question(
+        generator,
+        "은행이 파산하면 얼마까지 보호되나요?",
+        [],
+    )
+
+    assert answer == rag_module.INSUFFICIENT_EVIDENCE_MESSAGE
+
+
+def test_render_rag_answer_falls_back_for_unknown_source_id() -> None:
+    """검색되지 않은 법령 근거 ID를 사용자에게 노출하지 않음"""
+    answer = rag_module.RagAnswer(
+        can_answer=True,
+        answer="예금은 보호됩니다.",
+        source_ids=["S2"],
+    )
+
+    rendered = rag_module.render_rag_answer(
+        answer,
+        [{"law_name": "예금자보호법", "article_no": "제1조"}],
+    )
+
+    assert rendered == rag_module.INSUFFICIENT_EVIDENCE_MESSAGE
 
 
 def test_answer_with_retrieval_searches_articles_then_answers(monkeypatch) -> None:
@@ -183,18 +254,22 @@ def test_answer_with_retrieval_searches_articles_then_answers(monkeypatch) -> No
         top_k=3,
     )
 
-    assert answer == "예금은 관련 법령에 따라 보호됩니다."
+    assert answer == (
+        "예금은 관련 법령에 따라 보호됩니다.\n\n"
+        "확인한 법령 근거\n"
+        "- 예금자보호법 시행령 제18조 (시행일: 20250901)"
+    )
     assert calls == {
         "encoder": encoder,
         "collection": collection,
         "question": "예금은 얼마까지 보호되나요?",
         "top_k": 3,
     }
-    assert "보험금 한도는 1억원" in generator.prompts[0]
+    assert "보험금 한도는 1억원" in generator.messages[0][1]["content"]
 
 
-def test_stream_answer_question_streams_with_articles() -> None:
-    """검색 조문 목록으로 RAG 답변 조각 생성"""
+def test_stream_answer_question_yields_answer_chunks_and_validated_source() -> None:
+    """구조화 답변 본문 조각과 검증된 출처 순차 전달"""
     generator = FakeGenerator()
     articles = [
         {
@@ -211,6 +286,61 @@ def test_stream_answer_question_streams_with_articles() -> None:
         )
     )
 
-    assert chunks == ["예금은 ", "1억원까지 보호됩니다."]
-    assert "예금은 얼마까지 보호되나요?" in generator.prompts[0]
-    assert "예금자보호법 시행령 제18조" in generator.prompts[0]
+    assert len(chunks) > 1
+    assert "".join(chunks) == (
+        "예금은 관련 법령에 따라 보호됩니다.\n\n"
+        "확인한 법령 근거\n"
+        "- 예금자보호법 시행령 제18조 (시행일: 20250901)"
+    )
+    assert "예금은 얼마까지 보호되나요?" in generator.messages[0][1]["content"]
+    assert "예금자보호법 시행령 제18조" in generator.messages[0][1]["content"]
+
+
+def test_stream_answer_question_uses_fixed_message_when_evidence_is_insufficient() -> None:
+    """답변 불가 구조화 결과에서 고정 안내 한 조각 전달"""
+    generator = FakeGenerator(
+        rag_module.RagAnswer(
+            can_answer=False,
+            source_ids=[],
+            answer="",
+        )
+    )
+
+    chunks = list(
+        rag_module.stream_answer_question(
+            generator,
+            "주거 금융상품을 추천해 주세요.",
+            [],
+        )
+    )
+
+    assert chunks == [rag_module.INSUFFICIENT_EVIDENCE_MESSAGE]
+
+
+def test_stream_answer_question_does_not_expose_unknown_source_answer() -> None:
+    """검색되지 않은 출처의 답변 조각 노출 방지"""
+    generator = FakeGenerator(
+        rag_module.RagAnswer(
+            can_answer=True,
+            source_ids=["S2"],
+            answer="확인되지 않은 답변입니다.",
+        )
+    )
+    articles = [
+        {
+            "law_name": "예금자보호법",
+            "article_no": "제1조",
+            "effective_date": "20260102",
+            "text": "예금자 보호 목적",
+        }
+    ]
+
+    chunks = list(
+        rag_module.stream_answer_question(
+            generator,
+            "예금은 보호되나요?",
+            articles,
+        )
+    )
+
+    assert chunks == [rag_module.INSUFFICIENT_EVIDENCE_MESSAGE]

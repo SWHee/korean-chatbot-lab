@@ -1,33 +1,99 @@
 """법령 검색과 생성 모델을 연결하는 RAG 체인"""
 
-from langchain_core.output_parsers import StrOutputParser
+from collections.abc import Iterator
+from typing import Annotated
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda
+from pydantic import BaseModel, ConfigDict, Field
 
 from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
+
+
+INSUFFICIENT_EVIDENCE_MESSAGE = (
+    "현재 확인된 법령 근거만으로는 질문에 정확히 답변드리기 어렵습니다.\n"
+    "잘못된 안내를 피하기 위해 관련 없는 내용을 추측해서 설명하지 않겠습니다.\n"
+    "개별 상품이나 가입 조건은 해당 금융회사의 상품설명서와 관계 기관의 "
+    "최신 공식 안내를 함께 확인해 주세요."
+)
+
+
+class RagAnswer(BaseModel):
+    """법령 근거 기반 구조화 답변"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    can_answer: bool = Field(
+        description="제공된 법령 근거로 질문에 직접 답할 수 있는지 여부"
+    )
+    answer: str = Field(
+        description="답할 수 있을 때 고객에게 보여줄 쉬운 한국어 존댓말 설명"
+    )
+    source_ids: list[str] = Field(
+        default_factory=list,
+        max_length=DEFAULT_TOP_K,
+        description="답변을 직접 뒷받침하는 법령 근거 ID",
+    )
+
+
+class RagStreamEnvelope(BaseModel):
+    """근거를 답변보다 먼저 확정하는 스트리밍 전용 형식"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    result: tuple[
+        Annotated[
+            bool,
+            Field(description="법령 근거로 직접 답할 수 있는지"),
+        ],
+        Annotated[
+            list[str],
+            Field(
+                max_length=DEFAULT_TOP_K,
+                description="직접 근거가 되는 S번호 목록",
+            ),
+        ],
+        Annotated[
+            str,
+            Field(description="고객에게 보여줄 한국어 존댓말 답변"),
+        ],
+    ] = Field(
+        description="can_answer, source_ids, answer 순서의 결과",
+    )
 
 
 RAG_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "예·적금 소비자보호 법령 안내자로서 제공된 법령 근거만 사용해 "
-            "답변하세요. 근거가 부족하면 확인할 수 없다고 밝히고, 답변에는 "
-            "법령명·조문번호·시행일을 명시하세요. 개별 상품의 보호 여부는 "
-            "단정하지 마세요.",
+            "당신은 예·적금 금융 상담 챗봇에서 법령 근거를 설명하는 담당자입니다.\n"
+            "- 제공된 법령 근거만 사용하세요.\n"
+            "- 질문에 직접 답하는 근거가 있으면 can_answer를 true로 하고, "
+            "결론을 먼저 말한 뒤 필요한 이유와 조건을 친절한 한국어 존댓말로 "
+            "설명하세요. 같은 내용은 반복하지 마세요.\n"
+            "- 직접 답하는 근거가 없으면 can_answer를 false로 하고 answer와 "
+            "source_ids를 비우세요.\n"
+            "- source_ids에는 답변을 직접 뒷받침하는 제공된 [S번호]만 넣으세요.\n"
+            "- 근거에 없는 내용을 추측하거나 개별 상품의 보호 여부를 단정하지 "
+            "마세요.\n"
+            "- 전달된 JSON schema에 맞는 JSON만 반환하세요.",
         ),
+        # 사용자 질문과 검색 조문을 함께 전달
         ("human", "질문:\n{question}\n\n법령 근거:\n{context}"),
     ]
 )
-OUTPUT_PARSER = StrOutputParser()
 
 
 def format_context(articles: list[dict]) -> str:
-    """검색 조문의 출처와 본문을 합친 모델 입력 문맥"""
+    """검색 조문에 근거 ID를 붙인 모델 입력 문맥"""
+    if not articles:
+        return "검색된 법령 근거 없음"
+
     blocks = (
-        f"출처: {article['law_name']} {article['article_no']} "
+        f"[S{index}] 출처: {article['law_name']} {article['article_no']} "
         f"(시행일: {article['effective_date']})\n{article['text']}"
-        for article in articles
+        for index, article in enumerate(articles, start=1)
     )
     return "\n\n".join(blocks)
 
@@ -40,45 +106,185 @@ def build_rag_inputs(question: str, articles: list[dict]) -> dict[str, str]:
     }
 
 
+def prompt_to_chat_messages(prompt_value) -> list[dict[str, str]]:
+    """LangChain prompt를 역할별 Generator 메시지로 변환"""
+    messages = []
+    for message in prompt_value.to_messages():
+        if isinstance(message, SystemMessage):
+            role = "system"
+        elif isinstance(message, HumanMessage):
+            role = "user"
+        elif isinstance(message, AIMessage):
+            role = "assistant"
+        else:
+            raise TypeError(f"unsupported chat message: {type(message).__name__}")
+
+        if not isinstance(message.content, str):
+            raise TypeError("chat message content must be a string")
+        messages.append({"role": role, "content": message.content})
+    return messages
+
+
 def create_model_runnable(generator) -> RunnableLambda:
     """프로젝트 Generator를 LCEL model 단계로 연결한 Runnable"""
 
-    def generate_from_prompt(prompt_value) -> str:
-        prompt_text = prompt_value.to_string()
-        return generator.generate(prompt_text)
+    def generate_from_prompt(prompt_value) -> RagAnswer:
+        return generator.generate_structured(
+            messages=prompt_to_chat_messages(prompt_value),
+            response_model=RagAnswer,
+        )
 
     return RunnableLambda(generate_from_prompt)
 
 
 def create_rag_chain(generator) -> Runnable:
-    """prompt·model·parser를 연결한 LCEL 체인"""
-    prompt = RAG_PROMPT
-    model = create_model_runnable(generator)
-    parser = OUTPUT_PARSER
+    """prompt와 구조화 model 단계를 연결한 LCEL 체인"""
+    return RAG_PROMPT | create_model_runnable(generator)
 
-    return prompt | model | parser
+
+def validate_rag_answer(answer: RagAnswer, articles: list[dict]) -> None:
+    """답변 가능 여부와 실제 검색 근거 ID 조합 검증"""
+    available_source_ids = {
+        f"S{index}" for index in range(1, len(articles) + 1)
+    }
+    source_ids = set(answer.source_ids)
+
+    if len(source_ids) != len(answer.source_ids):
+        raise ValueError("source_ids must not contain duplicates")
+    if not source_ids <= available_source_ids:
+        raise ValueError("source_ids contain an unknown law source")
+    if answer.can_answer:
+        if not answer.answer.strip():
+            raise ValueError("grounded answer text is required")
+        if not source_ids:
+            raise ValueError("grounded answer requires at least one source")
+    elif answer.answer.strip() or source_ids:
+        raise ValueError("unanswerable result must not contain answer or sources")
+
+
+def render_rag_answer(answer: RagAnswer, articles: list[dict]) -> str:
+    """검증된 구조화 답변을 사용자용 상담 문장으로 변환"""
+    try:
+        validate_rag_answer(answer, articles)
+    except ValueError:
+        return INSUFFICIENT_EVIDENCE_MESSAGE
+
+    if not answer.can_answer:
+        return INSUFFICIENT_EVIDENCE_MESSAGE
+
+    article_by_id = {
+        f"S{index}": article
+        for index, article in enumerate(articles, start=1)
+    }
+    source_lines = []
+    for source_id in answer.source_ids:
+        article = article_by_id[source_id]
+        source_lines.append(
+            f"- {article['law_name']} {article['article_no']} "
+            f"(시행일: {article['effective_date']})"
+        )
+
+    sections = [
+        answer.answer.strip(),
+        "확인한 법령 근거\n" + "\n".join(source_lines),
+    ]
+
+    return "\n\n".join(sections)
 
 
 def answer_question(generator, question: str, articles: list[dict]) -> str:
-    """검색 조문 목록 기반 RAG 답변"""
+    """검색 조문 목록 기반 구조화 RAG 답변"""
     chain = create_rag_chain(generator)
     rag_inputs = build_rag_inputs(
         question=question,
         articles=articles,
     )
-    return chain.invoke(rag_inputs)
+    structured_answer = chain.invoke(rag_inputs)
+    return render_rag_answer(structured_answer, articles)
 
 
-def stream_answer_question(generator, question: str, articles: list[dict]):
-    """검색 조문 목록 기반 RAG 답변 조각"""
-    rag_inputs = build_rag_inputs(
-        question=question,
-        articles=articles,
+def stream_answer_question(
+    generator,
+    question: str,
+    articles: list[dict],
+) -> Iterator[str]:
+    """검증 가능한 구조화 답변 본문과 출처 순차 전달"""
+    prompt_value = RAG_PROMPT.invoke(
+        build_rag_inputs(
+            question=question,
+            articles=articles,
+        )
     )
-    prompt_value = RAG_PROMPT.invoke(rag_inputs)
-    prompt_text = prompt_value.to_string()
+    structured_stream = generator.stream_structured(
+        messages=[
+            {
+                **message,
+                "content": (
+                    message["content"]
+                    + "\n- 스트리밍 응답의 result 배열은 반드시 "
+                    "[can_answer, source_ids, answer] 순서로 채우세요."
+                    if message["role"] == "system"
+                    else message["content"]
+                ),
+            }
+            for message in prompt_to_chat_messages(prompt_value)
+        ],
+        response_model=RagStreamEnvelope,
+    )
+    streamed_answer = ""
 
-    return generator.stream(prompt_text)
+    while True:
+        try:
+            partial = next(structured_stream)
+        except StopIteration as completed:  # 반복이 끝났음을 알리는 예외처리 StopIteration
+            can_answer, source_ids, answer = completed.value.result
+            structured_answer = RagAnswer(
+                can_answer=can_answer,
+                source_ids=source_ids,
+                answer=answer,
+            )
+            break
+
+        result = partial.get("result")
+        if (
+            not isinstance(result, list)
+            or len(result) < 3
+            or result[0] is not True
+            or not isinstance(result[1], list)
+            or not isinstance(result[2], str)
+        ):
+            continue
+
+        visible_answer = result[2].strip()
+        try:
+            validate_rag_answer(
+                RagAnswer(
+                    can_answer=True,
+                    source_ids=result[1],
+                    answer=visible_answer,
+                ),
+                articles,
+            )
+        except (TypeError, ValueError):
+            continue
+
+        if not visible_answer.startswith(streamed_answer):
+            continue
+        new_text = visible_answer[len(streamed_answer) :]
+        if new_text:
+            streamed_answer = visible_answer
+            yield new_text
+
+    rendered_answer = render_rag_answer(structured_answer, articles)
+    if not streamed_answer:
+        yield rendered_answer
+        return
+
+    if not rendered_answer.startswith(streamed_answer):
+        raise ValueError("structured answer changed after streaming")
+    remaining_text = rendered_answer[len(streamed_answer) :]
+    if remaining_text:
+        yield remaining_text
 
 
 def answer_with_retrieval(
