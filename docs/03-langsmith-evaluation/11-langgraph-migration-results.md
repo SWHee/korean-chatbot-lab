@@ -76,7 +76,7 @@ Judge 판정은 실행할 때마다 달라질 수 있고, A1에서는 Judge가 �
 완료됐다고 보았습니다.
 
 평가 답변을 살펴보면서 같은 결론을 반복하는 문제도 발견했습니다. 다음에는 그래프
-구조와 검색 설정을 그대로 두고 prompt의 답변 형식만 1차적으로 변경해보려고 합니다.
-반복 문장을 줄이는 `prompt v2`를 A1 한 문항으로 먼저 확인한 뒤 같은 Dataset으로
-재평가하면, 구조 변경과 prompt 변경의 영향을 LangSmith에서 확인할 수 있을 것
-같습니다.
+구조와 검색 설정을 그대로 두고 간결화 Prompt 후보를 비교했습니다. 이 후보는
+응답이 짧고 빨라졌지만 품질이 낮아 미채택했으며, 후속 방향은
+[RAG Structured Output v2 설계](../05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md)에
+기록했습니다.
