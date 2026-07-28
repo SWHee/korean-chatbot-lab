@@ -2,8 +2,9 @@
 
 로컬 LLM으로 한국어 금융 안내 챗봇을 만들며, 생성 모델 서빙부터 법령 RAG와
 LangGraph까지 단계적으로 익히는 프로젝트입니다. 현재 법령 검색·생성 흐름의
-LangGraph 전환과 회귀 평가를 마쳤고, 법령 답변을 간결하게 만드는 prompt 실험 뒤
-금융상품 한눈에 API를 연결해 법령·상품·혼합 질문을 구분하는 Agent로 확장합니다.
+LangGraph 전환과 회귀 평가를 마쳤고, 법령 답변에 Structured Output과 검색 근거
+검증을 적용했습니다. 다음에는 금융상품 한눈에 API의 정기예금 호출 함수를 구현하고,
+법령·상품·혼합 질문을 구분하는 Workflow와 Tool Agent로 단계적으로 확장합니다.
 
 > 이 프로젝트의 답변은 학습·시연용입니다. 최신 법령, 개별 상품의 보호 여부,
 > 금융 의사결정은 반드시 공식 공시와 관계 기관 정보를 다시 확인해야 합니다.
@@ -13,12 +14,12 @@ LangGraph 전환과 회귀 평가를 마쳤고, 법령 답변을 간결하게 �
 | 구분 | 현재 구현 |
 | --- | --- |
 | 생성 모델 | Qwen3-4B-Instruct-2507 · 기본 실행은 Ollama q4_K_M |
-| API | 법령 RAG의 JSON·스트리밍 요청 제공 |
+| API | 법령 RAG의 JSON·텍스트 응답 제공 |
 | 실행 흐름 | LangGraph `retrieve → generate` · 생성 Node 안에서 LCEL 재사용 |
 | RAG 데이터 | 금융소비자보호법·예금자보호법과 각 시행령, 총 4건 |
 | 검색 | KURE-v1 임베딩(1024차원) · Chroma 벡터스토어 |
 | 평가 | LangSmith 24문항 · LangChain/LangGraph 검색 지표 동일 · 실행 오류 0건 |
-| 다음 POC | 법령 근거 유무에 따라 답변을 줄이는 RAG prompt v2 |
+| 다음 확인 | Finlife 은행권 정기예금 1페이지 호출 함수 |
 | 검증 | pytest와 임베딩·인덱스 재현 스크립트 |
 
 ## 아키텍처
@@ -33,7 +34,7 @@ flowchart LR
     LG --> E[retrieve Node<br/>KURE-v1 질문 임베딩]
     E --> V[(Chroma<br/>법령 인덱스)]
     V --> T[Retriever<br/>상위 조문 선택]
-    T --> L[generate Node<br/>LCEL prompt · model · parser]
+    T --> L[generate Node<br/>LCEL prompt · structured model]
     L --> G
 
     G[Generator 경계]
@@ -64,23 +65,21 @@ orchestrator 역할을 맡습니다.
 - Streamlit 기반 법령 RAG 채팅·스트리밍 화면
 - LangSmith 24문항 LangChain 기준선과 LangGraph 전환 평가
 - 전환 전후 검색 `precision_top_5=0.280`, `recall_top_5=0.711` 유지
+- Ollama JSON Schema·Pydantic 검증과 검색 근거 ID 기반 RAG 응답 v2
 - Finlife 인증키 환경 변수와 공식 API 정상·본문 오류 응답 계약 확인
 
 ## 다음에 이어갈 범위
 
-다음 구현은 `src/chatbot/rag.py`의 prompt만 바꾸어 근거가 있으면 결론과 관련
-조문을 제시하고, 근거가 없으면 관련 없는 조문을 나열하지 않도록 만드는
-`RAG prompt v2`입니다. 검색과 Graph 구조는 유지하고 정상 질문 한 건과 근거 부족
-질문 한 건을 서버 UI에서 비교합니다.
-
-그 뒤에는 다음 순서를 따릅니다.
+다음 작업은 Finlife client를 Graph와 분리해 구현하는 것입니다. 기존 24문항은
+Agent 점수에 합치지 않고 법령 검색·답변 경로의 회귀 평가로 계속 사용합니다.
 
 1. Finlife 은행권 정기예금 API 1페이지 단독 호출
-2. Finlife 기본 상품과 금리 옵션을 프로젝트 내부 이름으로 정규화
-3. 상품 조회 Node와 상품 답변의 한 경로 확인
-4. 법령·상품·혼합·추가 정보 필요 질문을 조건부 Edge로 분기
-5. 같은 두 조회 기능을 read-only Tool로 노출하고 모델의 tool calling 연결
-6. Agent용 개발 Dataset을 만들고 도구 선택·인자·호출 경로·최종 답변 평가
+2. 기본 상품과 금리 옵션 정규화·필터·정렬
+3. 상품 조회 Node와 고정 route 조건부 Edge
+4. 법령·상품·혼합·추가 정보·범위 밖 Routed Workflow
+5. 비스트리밍 Workflow API
+6. 두 조회 기능의 tool calling과 Agent loop
+7. Agent용 Dataset과 기준선 평가
 
 세부 계약과 단계별 완료 기준은
 [Finlife에서 LangGraph Agent까지 확장 명세](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md)에
@@ -131,11 +130,16 @@ uv run fastapi dev
 - API: `http://127.0.0.1:8000`
 - Swagger UI: `http://127.0.0.1:8000/docs`
 
-Hugging Face backend를 확인하고 싶다면 서버 실행 전에 환경 변수를 지정합니다.
+Hugging Face 생성기는 직접 추론 학습 기록으로 남아 있지만, 현재 RAG 응답 v2는
+Ollama native JSON Schema를 사용하므로 `/ask-rag` 실행은 기본 Ollama backend를
+사용합니다.
 
 ```bash
 CHATBOT_BACKEND=hf uv run fastapi dev
 ```
+
+위 설정은 기존 HF 생성기 자체를 확인하기 위한 선택이며 Structured Output v2
+RAG endpoint는 지원하지 않습니다.
 
 ### 4. 채팅 UI 실행
 
@@ -221,9 +225,11 @@ uv run python scripts/verify_index.py
 | [LangChain v1 기준선 결과](docs/03-langsmith-evaluation/06-langchain-baseline-results.md) | 24문항 검색·답변 평가 결과 |
 | [첫 기준선 문제 해결](docs/03-langsmith-evaluation/08-langchain-baseline-troubleshooting.md) | 첫 평가에서 겪은 오류와 확인 순서 |
 | [LangGraph 전환 결과](docs/03-langsmith-evaluation/11-langgraph-migration-results.md) | 같은 24문항으로 확인한 전환 결과 |
+| [RAG에서 Agent 평가로 확장하며 정리한 판단](docs/03-langsmith-evaluation/12-agent-evaluation-research.md) | 기존 Dataset의 역할 변화와 Agent 평가 도구 조사 |
 | [LangGraph 전환 계획](docs/04-langgraph-migration/01-langgraph-migration-plan.md) | 완료된 StateGraph 전환의 원래 작업 순서 |
 | [LangGraph 마이그레이션의 의미](docs/04-langgraph-migration/03-what-langgraph-migration-means.md) | Graph와 LCEL의 역할, Agent 발전 방향 |
-| [RAG 응답 시간 측정 계획](docs/05-performance-improvement/01-rag-latency-baseline-plan.md) | Agent 기준선 뒤 진행할 성능 측정 |
+| [성능 개선 기록](docs/05-performance-improvement/README.md) | 지연시간·응답 신뢰성 개선 단위와 현재 상태 |
+| [RAG Structured Output v2 설계](docs/05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md) | schema·근거 검증·렌더링 적용과 비교 계획 |
 | [Finlife·Agent 확장 명세](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md) | 현재부터 적용할 구현·평가 순서 |
 
 계획 문서는 작성 당시의 질문을 보존하므로 미래 항목이 서로 다르게 보일 수 있습니다.
@@ -233,9 +239,9 @@ uv run python scripts/verify_index.py
 | ---: | --- | --- | --- |
 | 1 | [`03-rag-baseline-workflow.md`](docs/03-langsmith-evaluation/03-rag-baseline-workflow.md) | LangChain 기준선 → 같은 기능의 LangGraph 비교 | 완료 |
 | 2 | [`01-langgraph-migration-plan.md`](docs/04-langgraph-migration/01-langgraph-migration-plan.md) | StateGraph 핵심 → API·스트리밍 → 24문항 재평가 | 완료 |
-| 3 | [`03-rag-answer-repetition.md`](docs/05-performance-improvement/03-rag-answer-repetition.md) | 근거 유무에 따른 간결한 RAG prompt v2 | 다음 작업 |
-| 4 | [`01-finlife-agent-expansion-spec.md`](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md) | Finlife 단독 호출 → 분기 → Tool Agent → Agent 평가 | prompt 실험 뒤 진행 |
-| 5 | [`01-rag-latency-baseline-plan.md`](docs/05-performance-improvement/01-rag-latency-baseline-plan.md) | Agent 기준선 뒤 세부 병목 측정과 한 변수 최적화 | 대기 |
+| 3 | [`03-structured-output-v2-design.md`](docs/05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md) | 역할 메시지 → schema → 근거 검증 → 상담형 렌더링 | 구현·대표 UI와 스트리밍 확인, 법령 회귀평가 유지 |
+| 4 | [`01-finlife-agent-expansion-spec.md`](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md) | Finlife client → Routed Workflow → Tool Agent → Agent 평가 | 현재 진행 |
+| 5 | [`01-baseline-and-measurement-plan.md`](docs/05-performance-improvement/01-rag-latency/01-baseline-and-measurement-plan.md) | Agent 기준선 뒤 세부 병목 측정과 한 변수 최적화 | 대기 |
 
 ## 디렉터리 구조
 
@@ -252,7 +258,7 @@ korean-chatbot/
 │   ├── 02-langchain-rag/        RAG 설계·실험·파이프라인
 │   ├── 03-langsmith-evaluation/ Dataset·추적·기준선 평가
 │   ├── 04-langgraph-migration/  완료된 StateGraph 전환
-│   ├── 05-performance-improvement/ 응답 품질·속도 관찰과 후속 계획
+│   ├── 05-performance-improvement/ 개선 단위별 설계·적용·비교 기록
 │   ├── 06-other/                외부 데이터와 UI 기록
 │   └── 07-langgraph-agent/      Finlife·질문 분기·Agent 확장 명세
 ├── scripts/
