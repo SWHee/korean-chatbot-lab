@@ -1,0 +1,13 @@
+.git
+.github
+.venv
+.env
+.pytest_cache
+**/__pycache__
+*.pyc
+
+data/index
+docs
+tests
+frontend
+streamlit_app.py

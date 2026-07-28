@@ -1,0 +1,26 @@
+services:
+  api:
+    build: .
+    image: ${DOCKERHUB_USERNAME:-local}/korean-chatbot:latest
+    ports:
+      - "8000:8000"
+    environment:
+      CHATBOT_BACKEND: ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      LANGSMITH_TRACING: "false"
+    volumes:
+      - ./data/index:/app/data/index
+      - huggingface_cache:/root/.cache/huggingface
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  huggingface_cache:
+  ollama_data:
