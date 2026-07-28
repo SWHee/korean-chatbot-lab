@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from time import perf_counter
 
+import langfeather
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -16,6 +17,9 @@ from chatbot.ollama_generator import OllamaGenerator
 from chatbot.retriever import DEFAULT_TOP_K
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
+
+LANGFEATHER_TRACE_NAME = "korean-chatbot-rag"
+LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS = 2.0
 
 
 class RagRequest(BaseModel):
@@ -48,12 +52,24 @@ def prepare_rag_resources(app: FastAPI) -> None:
     if not hasattr(app.state, "collection"):
         app.state.collection = open_collection()
     if not hasattr(app.state, "rag_graph"):
-        app.state.rag_graph = create_rag_graph(
+        rag_graph = create_rag_graph(
             generator=app.state.generator,
             encoder=app.state.encoder,
             collection=app.state.collection,
             top_k=DEFAULT_TOP_K,
         )
+        app.state.langfeather_enabled = (
+            os.getenv("LANGFEATHER_ENABLED", "false").strip().lower() == "true"
+        )
+        if app.state.langfeather_enabled:
+            langfeather.configure(
+                endpoint=os.getenv("LANGFEATHER_ENDPOINT") or None,
+            )
+            rag_graph = langfeather.wrap_runnable(
+                rag_graph,
+                name=LANGFEATHER_TRACE_NAME,
+            )
+        app.state.rag_graph = rag_graph
 
 
 @asynccontextmanager
@@ -70,10 +86,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.generator = Generator()
     else:
         raise ValueError(f"unknown CHATBOT_BACKEND: {backend}")
-    yield
-    for name in ("generator", "encoder", "collection", "rag_graph"):
-        if hasattr(app.state, name):
-            delattr(app.state, name)
+    try:
+        yield
+    finally:
+        if getattr(app.state, "langfeather_enabled", False):
+            await asyncio.to_thread(
+                langfeather.shutdown,
+                timeout=LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS,
+            )
+        for name in (
+            "generator",
+            "encoder",
+            "collection",
+            "rag_graph",
+            "langfeather_enabled",
+        ):
+            if hasattr(app.state, name):
+                delattr(app.state, name)
 
 
 app = FastAPI(

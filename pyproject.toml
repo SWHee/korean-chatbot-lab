@@ -10,6 +10,7 @@ dependencies = [
     "langchain-core>=1.4.8",
     "langchain-google-genai>=4.2.7",
     "langchain-text-splitters>=1.1.2",
+    "langfeather[langchain]",
     "langgraph>=1.2.9",
     "langsmith>=0.9.7",
     "python-dotenv>=1.2.1",
@@ -30,6 +31,9 @@ build-backend = "uv_build"
 
 [tool.uv.build-backend]
 module-name = "chatbot"
+
+[tool.uv.sources]
+langfeather = { git = "https://github.com/SungjinWi99/langfeather.git", subdirectory = "sdk/python", rev = "a410f7c4211bbcabb9c9e5717bc23988797f9605" }
 
 [tool.fastapi]
 entrypoint = "chatbot.main:app"

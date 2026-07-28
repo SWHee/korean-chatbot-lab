@@ -5,5 +5,6 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def disable_langsmith_tracing(monkeypatch) -> None:
-    """단위 테스트 중 LangSmith 업로드 방지"""
+    """단위 테스트 중 외부 추적 전송 방지"""
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
+    monkeypatch.setenv("LANGFEATHER_ENABLED", "false")

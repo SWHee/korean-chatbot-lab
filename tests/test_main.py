@@ -41,6 +41,7 @@ def test_prepare_rag_resources_creates_graph(monkeypatch) -> None:
     monkeypatch.setattr(main_module, "load_encoder", lambda: encoder)
     monkeypatch.setattr(main_module, "open_collection", lambda: collection)
     monkeypatch.setattr(main_module, "create_rag_graph", fake_create_rag_graph)
+    monkeypatch.delenv("LANGFEATHER_ENABLED", raising=False)
 
     main_module.prepare_rag_resources(app)
 
@@ -53,6 +54,54 @@ def test_prepare_rag_resources_creates_graph(monkeypatch) -> None:
         "collection": collection,
         "top_k": 5,
     }
+    assert app.state.langfeather_enabled is False
+
+
+def test_prepare_rag_resources_wraps_graph_when_langfeather_enabled(
+    monkeypatch,
+) -> None:
+    """환경 변수로 선택한 LangFeather 그래프 추적 연결"""
+    rag_graph = object()
+    traced_graph = object()
+    app = SimpleNamespace(
+        state=SimpleNamespace(
+            generator=FakeGenerator(),
+            encoder=object(),
+            collection=object(),
+        )
+    )
+    configured_endpoints = []
+    wrapped_graphs = []
+
+    monkeypatch.setenv("LANGFEATHER_ENABLED", "true")
+    monkeypatch.setenv("LANGFEATHER_ENDPOINT", "http://127.0.0.1:4319")
+    monkeypatch.setattr(
+        main_module,
+        "create_rag_graph",
+        lambda **resources: rag_graph,
+    )
+    monkeypatch.setattr(
+        main_module.langfeather,
+        "configure",
+        lambda endpoint: configured_endpoints.append(endpoint),
+    )
+
+    def fake_wrap_runnable(runnable, *, name):
+        wrapped_graphs.append((runnable, name))
+        return traced_graph
+
+    monkeypatch.setattr(
+        main_module.langfeather,
+        "wrap_runnable",
+        fake_wrap_runnable,
+    )
+
+    main_module.prepare_rag_resources(app)
+
+    assert app.state.langfeather_enabled is True
+    assert app.state.rag_graph is traced_graph
+    assert configured_endpoints == ["http://127.0.0.1:4319"]
+    assert wrapped_graphs == [(rag_graph, "korean-chatbot-rag")]
 
 
 def test_lifespan_loads_local_env_before_backend_selection(monkeypatch) -> None:
@@ -75,6 +124,33 @@ def test_lifespan_loads_local_env_before_backend_selection(monkeypatch) -> None:
     asyncio.run(run_lifespan())
 
     assert calls == ["env"]
+
+
+def test_lifespan_shuts_down_enabled_langfeather(monkeypatch) -> None:
+    """서버 종료 시 대기 중인 LangFeather 추적 전송"""
+    shutdown_timeouts = []
+
+    class FakeOllamaGenerator:
+        pass
+
+    async def run_lifespan():
+        state = SimpleNamespace()
+        app = SimpleNamespace(state=state)
+        async with main_module.lifespan(app):
+            app.state.langfeather_enabled = True
+
+    monkeypatch.setenv("CHATBOT_BACKEND", "ollama")
+    monkeypatch.setattr(main_module, "load_local_env", lambda: None)
+    monkeypatch.setattr(main_module, "OllamaGenerator", FakeOllamaGenerator)
+    monkeypatch.setattr(
+        main_module.langfeather,
+        "shutdown",
+        lambda timeout: shutdown_timeouts.append(timeout) or True,
+    )
+
+    asyncio.run(run_lifespan())
+
+    assert shutdown_timeouts == [2.0]
 
 
 def test_ask_rag_route_exists() -> None:
