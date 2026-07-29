@@ -1,158 +1,180 @@
-# Korean Chatbot Lab
+<p align="center">
+  <img
+    src="docs/assets/readme-hero.png"
+    alt="법령 문서와 검색 연결망을 배경으로 한 금융안심 챗봇"
+    width="100%"
+  />
+</p>
 
-로컬 LLM으로 한국어 금융 안내 챗봇을 만들며, 생성 모델 서빙부터 법령 RAG와
-LangGraph까지 단계적으로 익히는 프로젝트입니다. 현재 법령 검색·생성 흐름의
-LangGraph 전환과 회귀 평가를 마쳤고, 법령 답변에 Structured Output과 검색 근거
-검증을 적용했습니다. Next.js 상담 UI와 로컬 추적 화면으로 실제 응답 흐름을 확인할
-수 있으며, Docker·EC2·GitHub Actions 배포 실습의 기본 파일도 마련했습니다. 다음에는
-금융상품 한눈에 API의 정기예금 호출 함수를 구현하고, 법령·상품·혼합 질문을 구분하는
-Workflow와 Tool Agent로 단계적으로 확장합니다.
+<h1 align="center">금융안심 · Korean Chatbot Lab</h1>
 
-> 이 프로젝트의 답변은 학습·시연용입니다. 최신 법령, 개별 상품의 보호 여부,
-> 금융 의사결정은 반드시 공식 공시와 관계 기관 정보를 다시 확인해야 합니다.
+<p align="center">
+  한국 금융 법령에서 근거 조문을 찾고, 로컬 LLM으로 쉽게 설명하는 RAG 챗봇
+</p>
 
-## 한눈에 보기
+<p align="center">
+  <a href="https://www.python.org/">
+    <img alt="Python 3.13" src="https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white">
+  </a>
+  <a href="https://fastapi.tiangolo.com/">
+    <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.138+-009688?style=flat-square&logo=fastapi&logoColor=white">
+  </a>
+  <a href="https://python.langchain.com/">
+    <img alt="LangChain" src="https://img.shields.io/badge/LangChain-LCEL-1C3C3C?style=flat-square&logo=langchain&logoColor=white">
+  </a>
+  <a href="https://docs.langchain.com/oss/python/langgraph/">
+    <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-1.2+-1C3C3C?style=flat-square">
+  </a>
+  <a href="https://ollama.com/">
+    <img alt="Ollama Qwen3" src="https://img.shields.io/badge/Ollama-Qwen3_4B-111111?style=flat-square&logo=ollama&logoColor=white">
+  </a>
+  <a href="https://nextjs.org/">
+    <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white">
+  </a>
+</p>
 
-| 구분 | 현재 구현 |
-| --- | --- |
-| 생성 모델 | Qwen3-4B-Instruct-2507 · 기본 실행은 Ollama q4_K_M |
-| API | 법령 RAG의 JSON·텍스트 응답 제공 |
-| UI | Next.js 16 · React 19 · FastAPI 스트리밍 프록시 |
-| 실행 흐름 | LangGraph `retrieve → generate` · 생성 Node 안에서 LCEL 재사용 |
-| RAG 데이터 | 금융소비자보호법·예금자보호법과 각 시행령, 총 4건 |
-| 검색 | KURE-v1 임베딩(1024차원) · Chroma 벡터스토어 |
-| 평가 | LangSmith 24문항 · LangChain/LangGraph 검색 지표 동일 · 실행 오류 0건 |
-| 추적 | LangSmith · 선택적 LangFeather 로컬 대시보드 |
-| 배포 | FastAPI·Ollama Docker Compose와 GitHub Actions·EC2 배포 뼈대 |
-| 다음 확인 | Finlife 은행권 정기예금 1페이지 호출 함수 |
-| 검증 | pytest와 임베딩·인덱스 재현 스크립트 |
+<p align="center">
+  <a href="#핵심-기능">핵심 기능</a> ·
+  <a href="#아키텍처">아키텍처</a> ·
+  <a href="#빠른-시작">빠른 시작</a> ·
+  <a href="#평가">평가</a> ·
+  <a href="#로드맵">로드맵</a>
+</p>
+
+---
+
+## 프로젝트 소개
+
+금융안심은 예금자보호와 금융소비자 권리에 관한 질문을 현재 수집된 법령 안에서
+검색하고, 답변을 뒷받침하는 법령명·조문·시행일을 함께 반환하는 로컬 RAG
+(검색 증강 생성) 애플리케이션입니다.
+
+핵심 경로는 법령 XML 수집부터 조문 단위 검색, 구조화된 답변 생성, FastAPI
+스트리밍, Next.js 상담 화면까지 하나의 실행 가능한 흐름으로 연결되어 있습니다.
+LangGraph 전환 전후에는 같은 24문항 Dataset으로 검색 결과가 유지되는지도
+확인했습니다.
+
+> 이 프로젝트의 답변은 학습·시연용입니다. 최신 법령, 개별 상품의 보호 여부와
+> 금융 의사결정은 반드시 관계 기관의 공식 공시를 다시 확인해야 합니다.
+
+> **현재 발전 단계 — Workflow → AI Agent**
+>
+> 지금은 `retrieve → generate` 두 노드가 정해진 순서로 실행되는 LangGraph
+> Workflow입니다. 아직 모델이 Tool 사용과 반복 여부를 스스로 선택하는 Agent는
+> 아니며, Finlife 상품 조회·질문 라우팅·법령과 상품 Tool을 단계적으로 더해
+> **하나의 AI Agent로 발전 중인 프로젝트**입니다.
+
+## 핵심 기능
+
+- **근거 중심 답변** — 검색된 법령 조문만 사용하고, 직접 근거가 부족하면 추측
+  대신 안내 범위를 명확히 표시합니다.
+- **구조화된 생성** — Ollama JSON Schema와 Pydantic 검증으로 답변 가능 여부,
+  본문, 근거 ID를 일관된 형식으로 처리합니다.
+- **조문 단위 검색** — KURE-v1 임베딩과 Chroma를 사용하며, 긴 조문만 나누고
+  검색 결과는 다시 조문 단위로 중복 제거합니다.
+- **동일한 JSON·스트리밍 경로** — LangGraph의 `retrieve → generate` 흐름을
+  FastAPI JSON 응답과 순수 텍스트 스트림에서 함께 사용합니다.
+- **상담형 웹 UI** — Next.js 프록시가 FastAPI 스트림을 전달하며, 입력 검증,
+  예시 질문, 자동 스크롤과 반응형 대화 화면을 제공합니다.
+- **재현 가능한 평가** — 로컬 24문항 Dataset, LangSmith evaluator와 인덱스
+  검증 스크립트로 변경 전후를 비교합니다.
+
+## 현재 상태
+
+| 영역 | 상태 | 확인된 범위 |
+| --- | :---: | --- |
+| 법령 RAG | ✅ | 법령 수집·청킹·임베딩·Chroma 검색·근거 답변 |
+| 실행 흐름 | ✅ | LangGraph `retrieve → generate`, LCEL 생성 단계 |
+| API | ✅ | JSON 응답과 텍스트 스트리밍 |
+| Web UI | ✅ | Next.js 상담 화면과 FastAPI 프록시 |
+| 평가·추적 | ✅ | 24문항 회귀평가, LangSmith, 선택적 LangFeather |
+| 전체 배포 | 🚧 | FastAPI·Ollama 뼈대 존재, Next.js 포함 Compose·CI 보강 중 |
+| 금융상품 조회 | ⬜ | Finlife 정기예금 client 구현 전 |
+| Routed Workflow·Agent | ⬜ | 상품 조회 검증 후 단계적으로 구현 |
+
+현재 기능 개발의 다음 작은 단위는 **Finlife 은행권 정기예금 1페이지 호출
+client**입니다. 배포 트랙에서는 Next.js 이미지를 포함한 전체 Compose 실행과 CI
+검증이 남아 있습니다.
 
 ## 아키텍처
 
 ```mermaid
 flowchart LR
-    U[사용자 질문] --> UI[Next.js 상담 UI]
+    U[사용자] --> UI[Next.js 상담 UI]
     UI --> PX[Next.js API proxy]
     PX --> API[FastAPI]
 
-    API --> R["/ask-rag · /ask-rag/stream"]
-    R --> LG[LangGraph]
-    LG --> E[retrieve Node<br/>KURE-v1 질문 임베딩]
-    E --> V[(Chroma<br/>법령 인덱스)]
-    V --> T[Retriever<br/>상위 조문 선택]
-    T --> L[generate Node<br/>LCEL prompt · structured model]
-    L --> G
+    API --> LG[LangGraph]
+    LG --> RT[retrieve]
+    RT --> EM[KURE-v1]
+    EM --> VS[(Chroma)]
+    VS --> RT
+    RT --> GN[generate]
+    GN --> LC[LCEL prompt]
+    LC --> OL[Ollama · Qwen3]
+    GN --> API
 
-    G[Generator 경계]
-    G --> O[Ollama Qwen3<br/>기본 backend]
-    G -. 선택 .-> H[Hugging Face Qwen3]
-
-    X[국가법령정보 Open API<br/>법령 XML 4건] --> P[파싱 · 청킹 · 임베딩]
-    P --> V
-
-    API -. 다음 단계 .-> A[LangGraph Agent]
-    A -. 법령 Tool .-> T
-    A -. 상품 Tool .-> F[Finlife API]
+    XML[법령 XML 4건] --> PS[조문 파싱·청킹]
+    PS --> IX[임베딩·인덱싱]
+    IX --> VS
 ```
 
-실선은 현재 구현이고 점선은 다음 확장입니다. 현재 LangGraph는 검색과 생성의 큰
-순서와 상태를 관리하고, 생성 Node는 기존 LCEL 체인을 재사용합니다. 앞으로의
-Agent는 이 법령 검색 자원을 버리지 않고 Finlife 상품 조회와 함께 선택하는 상위
-orchestrator 역할을 맡습니다.
+프로젝트가 소유하는 생성기 경계가 Ollama와 Hugging Face 구현을 감쌉니다. 현재
+법령 RAG v2는 Ollama의 native JSON Schema를 사용하며, Hugging Face backend는
+기존 직접 추론 흐름을 확인하기 위한 선택적 구현으로 남아 있습니다.
 
-## 현재 완료한 범위
+### 데이터 흐름
 
-- Qwen3 기반 로컬 생성기와 Ollama backend 전환
-- FastAPI 법령 RAG JSON·순수 텍스트 스트리밍 API
-- 법령 XML 수집, 조문 파싱, 조문 경계 기반 청킹
-- KURE-v1 모델 비교·선정과 Chroma 인덱스 생성
-- 질문 임베딩 → 조문 검색 → LCEL 답변 생성의 최소 RAG 흐름
-- LangGraph `retrieve → generate` StateGraph와 FastAPI 연결
-- Next.js 기반 상담 UI와 FastAPI 스트리밍 프록시
-- LangSmith 24문항 LangChain 기준선과 LangGraph 전환 평가
-- 전환 전후 검색 `precision_top_5=0.280`, `recall_top_5=0.711` 유지
-- Ollama JSON Schema·Pydantic 검증과 검색 근거 ID 기반 RAG 응답 v2
-- LangSmith와 독립적으로 켤 수 있는 LangFeather 로컬 LangGraph 추적
-- Finlife 인증키 환경 변수와 공식 API 정상·본문 오류 응답 계약 확인
-- FastAPI·Ollama Docker Compose와 GitHub Actions·EC2 배포 파일 구성
+```text
+법령 XML
+  → 조문 파싱
+  → 조문 경계를 보존한 청킹
+  → KURE-v1 1024차원 임베딩
+  → Chroma 인덱스
+  → 질문과 가까운 상위 조문 검색
+  → 구조화된 근거 답변
+```
 
-## 다음에 이어갈 범위
+현재 corpus는 금융소비자보호법·예금자보호법과 각 시행령 4건입니다. 인덱싱
+기준으로 **260개 조문, 322개 청크**를 사용하며 원문 snapshot과 수집 방법은
+[법령 데이터 안내](data/laws/README.md)에서 확인할 수 있습니다.
 
-다음 작업은 Finlife client를 Graph와 분리해 구현하는 것입니다. 기존 24문항은
-Agent 점수에 합치지 않고 법령 검색·답변 경로의 회귀 평가로 계속 사용합니다.
+## 빠른 시작
 
-1. Finlife 은행권 정기예금 API 1페이지 단독 호출
-2. 기본 상품과 금리 옵션 정규화·필터·정렬
-3. 상품 조회 Node와 고정 route 조건부 Edge
-4. 법령·상품·혼합·추가 정보·범위 밖 Routed Workflow
-5. 비스트리밍 Workflow API
-6. 두 조회 기능의 tool calling과 Agent loop
-7. Agent용 Dataset과 기준선 평가
+### 요구 사항
 
-세부 계약과 단계별 완료 기준은
-[Finlife에서 LangGraph Agent까지 확장 명세](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md)에
-정리합니다.
+- Python 3.13
+- [uv](https://docs.astral.sh/uv/)
+- [Ollama](https://ollama.com/)
+- Node.js 20.9 이상과 npm
 
-## 빠르게 실행하기
-
-### 1. 환경 준비
-
-backend는 Python 3.13과 [uv](https://docs.astral.sh/uv/)를 사용합니다. Next.js
-상담 UI에는 Node.js 20.9 이상과 npm이 필요합니다.
+### 1. backend와 모델 준비
 
 ```bash
 uv sync --locked
-```
-
-기본 backend는 Ollama입니다. Ollama를 설치한 뒤 모델을 준비합니다.
-
-```bash
 ollama pull qwen3:4b-instruct-2507-q4_K_M
 ```
 
-Finlife 연동 단계에서는 저장소에 커밋하지 않는 `.env`에 다음 키를 사용합니다.
-
-```dotenv
-FINLIFE_API_KEY=<발급받은 인증키>
-```
-
-현재 `/ask-rag` 실행에는 이 키가 필요하지 않습니다. 키는 이후 FastAPI backend에서만
-읽고 Tool 인자·로그·LangSmith trace에는 포함하지 않습니다.
-
-### 2. 법령 인덱스 만들기
-
-저장소에는 법령 XML 원문만 포함합니다. 검색용 Chroma 인덱스는 아래 명령으로
-로컬에서 생성합니다.
+검색용 Chroma 인덱스는 Git에 포함하지 않으므로 최초 한 번 생성합니다.
 
 ```bash
 uv run python scripts/build_index.py
 ```
 
-### 3. 서버 실행
+첫 실행에서는 KURE-v1 모델을 내려받기 때문에 시간이 더 걸릴 수 있습니다.
+
+### 2. FastAPI 실행
 
 ```bash
 uv run fastapi dev
 ```
 
-서버와 Swagger UI는 각각 다음 주소에서 확인할 수 있습니다.
-
 - API: `http://127.0.0.1:8000`
 - Swagger UI: `http://127.0.0.1:8000/docs`
 
-Hugging Face 생성기는 직접 추론 학습 기록으로 남아 있지만, 현재 RAG 응답 v2는
-Ollama native JSON Schema를 사용하므로 `/ask-rag` 실행은 기본 Ollama backend를
-사용합니다.
+### 3. Next.js 실행
 
-```bash
-CHATBOT_BACKEND=hf uv run fastapi dev
-```
-
-위 설정은 기존 HF 생성기 자체를 확인하기 위한 선택이며 Structured Output v2
-RAG endpoint는 지원하지 않습니다.
-
-### 4. 채팅 UI 실행
-
-FastAPI 서버를 켜 둔 상태에서 새 터미널을 열어 실행합니다.
+새 터미널에서 다음 명령을 실행합니다.
 
 ```bash
 cd frontend
@@ -160,45 +182,16 @@ npm ci
 npm run dev
 ```
 
-브라우저에서 `http://localhost:3000`을 열면 법령 RAG 답변을 채팅 형태로 확인할
-수 있습니다. `3000`은 Next.js 개발 서버의 기본 포트이며 FastAPI의 `8000`과
-구분됩니다. 현재 모델은 질문 사이의 문맥을 기억하지 않습니다.
+`http://localhost:3000`에서 상담 UI를 확인할 수 있습니다. 브라우저는 Next.js의
+`POST /api/chat`을 호출하고, 서버 측 프록시는 FastAPI의 응답 스트림을 그대로
+전달합니다.
 
-### 5. 선택적 로컬 추적
+## API
 
-기본 실행에는 LangFeather가 필요하지 않습니다. 로컬 Docker 대시보드에서
-LangGraph의 `retrieve → generate` 실행을 확인할 때만 다음 환경 변수를 사용합니다.
-
-```bash
-LANGFEATHER_ENABLED=true \
-LANGFEATHER_ENDPOINT=http://127.0.0.1:4319 \
-uv run fastapi dev
-```
-
-LangFeather 컨테이너 준비와 종료 방법은
-[LangFeather 개인 실행 안내](docs/langfeather/01-local-setup.md)를 따릅니다.
-LangSmith 평가 연결은 그대로 유지되며, 두 추적 기능은 서로 대체하지 않습니다.
-
-## 컨테이너와 배포 상태
-
-루트 `Dockerfile`은 FastAPI 이미지를 만들고, `docker-compose.yml`은 FastAPI와
-Ollama를 함께 실행합니다. `.github/workflows/deploy.yml`에는 pytest, Docker Hub
-이미지 push, EC2 재시작 순서가 정의되어 있습니다.
-
-현재 저장소에는 실행 뼈대와 재현 순서가 있으며, 실제 EC2 환경의 secret·모델·Chroma
-인덱스 준비와 외부 접속 검증은 사용자 환경에서 완료해야 합니다. Next.js UI는 아직
-Docker Compose와 배포 workflow에 포함하지 않습니다. 단계별 명령은
-[Docker·EC2·GitHub Actions 실습 순서](docs/08-ci-cd-pipeline/01-challenge-workflow.md)에
-정리되어 있습니다.
-
-## API 사용 예시
-
-| Endpoint | 역할 | 응답 방식 |
+| Method | Endpoint | 설명 |
 | --- | --- | --- |
-| `POST /ask-rag` | 법령 검색 후 답변과 출처 반환 | JSON |
-| `POST /ask-rag/stream` | 법령 검색 후 답변을 텍스트 조각으로 전송 | plain text stream |
-
-법령 RAG 요청:
+| `POST` | `/ask-rag` | 답변, 검색 출처와 처리 시간을 JSON으로 반환 |
+| `POST` | `/ask-rag/stream` | 사용자에게 보여 줄 답변 본문을 텍스트 조각으로 전송 |
 
 ```bash
 curl -X POST http://127.0.0.1:8000/ask-rag \
@@ -206,7 +199,22 @@ curl -X POST http://127.0.0.1:8000/ask-rag \
   -d '{"question":"은행이 파산하면 내 예금은 얼마까지 보호받나요?"}'
 ```
 
-스트리밍은 터미널에서 `-N` 옵션으로 조각 전송을 바로 확인할 수 있습니다.
+```json
+{
+  "response": "검색된 법령 근거에 따른 답변",
+  "sources": [
+    {
+      "law_name": "예금자보호법",
+      "article_no": "제32조",
+      "effective_date": "20260102",
+      "similarity": 0.0
+    }
+  ],
+  "generation_seconds": 0.0
+}
+```
+
+스트리밍 응답은 curl의 버퍼링을 끄고 확인합니다.
 
 ```bash
 curl -N -X POST http://127.0.0.1:8000/ask-rag/stream \
@@ -214,124 +222,100 @@ curl -N -X POST http://127.0.0.1:8000/ask-rag/stream \
   -d '{"question":"예금자보호제도는 무엇인가요?"}'
 ```
 
-`/ask-rag`는 답변, 검색 출처, 처리 시간을 JSON으로 함께 반환하므로 검증의 기준
-endpoint로 사용합니다. `/ask-rag/stream`은 사용자가 답변을 기다리는 동안 자연스럽게
-읽을 수 있도록 답변 본문만 전송합니다.
+## 설정
 
-## 법령 RAG 데이터 흐름
+기본 생성 backend는 Ollama이며 `OLLAMA_BASE_URL`의 기본값은
+`http://localhost:11434`입니다. 로컬 `.env`에서 LangSmith와 선택적 LangFeather
+추적을 설정할 수 있습니다.
 
-```text
-data/laws/*.xml
-       │  국가법령정보 Open API에서 수집한 원문 snapshot
-       ▼
-statutes.py      XML을 조문(Article) 단위로 파싱
-       ▼
-chunking.py      조문 경계를 보존하며 긴 조문만 분할
-       ▼
-embedding.py     KURE-v1으로 정규화된 1024차원 벡터 생성
-       ▼
-build_index.py   문서·메타데이터·벡터를 Chroma에 저장
-       ▼
-retriever.py     질문과 가까운 청크를 찾고 조문 단위로 중복 제거
-       ▼
-graph.py         retrieve → generate 순서와 상태 관리
-       ▼
-rag.py           generate Node 안에서 LCEL로 근거 답변 생성
+```dotenv
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=<your-langsmith-api-key>
+LANGSMITH_PROJECT=korean-chatbot-rag-dev
+
+LANGFEATHER_ENABLED=false
+LANGFEATHER_ENDPOINT=http://127.0.0.1:4319
 ```
 
-현재 인덱싱 결과는 **260개 조문에서 322개 청크**입니다. 조문이 매우 긴 경우에만
-내부를 나누고, 각 청크에는 법령명·조문번호·시행일을 함께 보관합니다. 따라서
-검색 결과를 답변의 근거로 다시 표시할 수 있습니다.
+전체 설정 예시는 [.env.example](.env.example)을 참고하세요. `.env`, 모델 weight,
+cache와 Chroma 인덱스는 저장소에 커밋하지 않습니다.
 
-원문 출처, 수집 snapshot, 재수집 방법은 [data/laws/README.md](data/laws/README.md)에서
-확인할 수 있습니다. Chroma 인덱스와 모델 cache는 재생성 가능한 로컬 산출물이므로
-Git에 올리지 않습니다.
+## 평가
 
-## 검증과 참고 문서
+`rag-v1-dev`는 법령 질문, 일상 표현, 추가 정보 필요, 상충 표현과 범위 밖 질문을
+포함한 24문항 개발·회귀평가 Dataset입니다.
+
+| 기준 | LangChain 기준선 | LangGraph 전환 후 |
+| --- | ---: | ---: |
+| 실행 문항 | 24 | 24 |
+| 실행 오류 | 0 | 0 |
+| `precision_top_5` | 0.280 | 0.280 |
+| `recall_top_5` | 0.711 | 0.711 |
+
+검색 지표는 정답 조문이 정의된 15문항에 적용했습니다. 이 결과는 독립적인 최종
+성능 점수가 아니라, 같은 Dataset에서 LangGraph 전환이 기존 검색 동작을 바꾸지
+않았는지 확인한 개발 기준선입니다. 자세한 조건과 해석은
+[LangGraph 전환 결과](docs/03-langsmith-evaluation/11-langgraph-migration-results.md)에
+기록되어 있습니다.
+
+로컬 검증:
 
 ```bash
 uv run pytest
 uv run python scripts/verify_index.py
 ```
 
-| 문서 | 내용 |
-| --- | --- |
-| [RAG 파이프라인 개요](docs/02-langchain-rag/03-guides/01-rag-pipeline-overview.md) | 코드 파일별 인덱싱·검색 흐름 |
-| [외부 데이터와 API](docs/06-other/01-external-data-sources.md) | 법령 원문·금융상품 한눈에 API의 역할과 저장 기준 |
-| [RAG 평가 질문](docs/03-langsmith-evaluation/02-rag-questions.md) | retrieval 평가용 질문과 정답 조문 기준 |
-| [RAG 기준선 평가 순서](docs/03-langsmith-evaluation/03-rag-baseline-workflow.md) | LangGraph 전후를 같은 Dataset으로 비교하는 순서 |
-| [LangChain v1 기준선 결과](docs/03-langsmith-evaluation/06-langchain-baseline-results.md) | 24문항 검색·답변 평가 결과 |
-| [첫 기준선 문제 해결](docs/03-langsmith-evaluation/08-langchain-baseline-troubleshooting.md) | 첫 평가에서 겪은 오류와 확인 순서 |
-| [LangGraph 전환 결과](docs/03-langsmith-evaluation/11-langgraph-migration-results.md) | 같은 24문항으로 확인한 전환 결과 |
-| [RAG에서 Agent 평가로 확장하며 정리한 판단](docs/03-langsmith-evaluation/12-agent-evaluation-research.md) | 기존 Dataset의 역할 변화와 Agent 평가 도구 조사 |
-| [LangGraph 전환 계획](docs/04-langgraph-migration/01-langgraph-migration-plan.md) | 완료된 StateGraph 전환의 원래 작업 순서 |
-| [LangGraph 마이그레이션의 의미](docs/04-langgraph-migration/03-what-langgraph-migration-means.md) | Graph와 LCEL의 역할, Agent 발전 방향 |
-| [성능 개선 기록](docs/05-performance-improvement/README.md) | 지연시간·응답 신뢰성 개선 단위와 현재 상태 |
-| [RAG Structured Output v2 설계](docs/05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md) | schema·근거 검증·렌더링 적용과 비교 계획 |
-| [Finlife·Agent 확장 명세](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md) | 현재부터 적용할 구현·평가 순서 |
-| [Docker·EC2·GitHub Actions 실습](docs/08-ci-cd-pipeline/01-challenge-workflow.md) | 컨테이너부터 자동 배포까지의 단계 |
-| [Next.js 상담 UI](docs/09-frontend/02-nextjs-chat-ui.md) | Streamlit 교체 범위와 스트리밍 UI 검증 |
-| [LangFeather 로컬 추적](docs/langfeather/README.md) | LangSmith와 독립적인 로컬 trace 구조와 실행 문서 |
+frontend production build:
 
-계획 문서는 작성 당시의 질문을 보존하므로 미래 항목이 서로 다르게 보일 수 있습니다.
-현재 우선순위는 다음과 같습니다.
+```bash
+cd frontend
+npm run build
+```
 
-| 순서 | 기준 문서 | 문서가 다루는 범위 | 현재 상태 |
-| ---: | --- | --- | --- |
-| 1 | [`03-rag-baseline-workflow.md`](docs/03-langsmith-evaluation/03-rag-baseline-workflow.md) | LangChain 기준선 → 같은 기능의 LangGraph 비교 | 완료 |
-| 2 | [`01-langgraph-migration-plan.md`](docs/04-langgraph-migration/01-langgraph-migration-plan.md) | StateGraph 핵심 → API·스트리밍 → 24문항 재평가 | 완료 |
-| 3 | [`03-structured-output-v2-design.md`](docs/05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md) | 역할 메시지 → schema → 근거 검증 → 상담형 렌더링 | 구현·대표 UI와 스트리밍 확인, 법령 회귀평가 유지 |
-| 4 | [`01-finlife-agent-expansion-spec.md`](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md) | Finlife client → Routed Workflow → Tool Agent → Agent 평가 | 현재 진행 |
-| 5 | [`01-baseline-and-measurement-plan.md`](docs/05-performance-improvement/01-rag-latency/01-baseline-and-measurement-plan.md) | Agent 기준선 뒤 세부 병목 측정과 한 변수 최적화 | 대기 |
+## 로드맵
 
-## 디렉터리 구조
+기존 법령 RAG는 회귀 기준선으로 유지하고, 외부 금융상품 조회를 별도 경계에서
+검증한 뒤 상위 Workflow와 Agent로 확장합니다.
+
+1. **Finlife Client POC** — 정기예금 1페이지 정상 응답과 본문 오류 처리
+2. **상품 정규화·비교** — 상품·금리 옵션 연결, 기간 필터와 금리 정렬
+3. **Product Node POC** — 검증된 조회 조건으로 상품 후보를 State에 추가
+4. **Routed Workflow** — 법령·상품·혼합·추가 질문·범위 밖 경로 분리
+5. **Workflow API** — 기존 RAG endpoint를 유지한 채 비스트리밍 계약 추가
+6. **Tool-calling Agent** — 법령·상품 Tool 선택과 반복 종료 조건 검증
+7. **Agent 평가** — 고정 상품 fixture를 사용한 32문항 Dataset과 기준선
+8. **Agent 스트리밍 UI** — Tool 진행 상태와 최종 답변을 구분해 표시
+
+구현 단위별 입력·출력과 완료 조건은
+[Finlife에서 LangGraph Agent까지의 실행 명세](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md)를
+따릅니다.
+
+## 프로젝트 구조
 
 ```text
 korean-chatbot/
-├── .github/workflows/           pytest·Docker Hub·EC2 배포 workflow
-├── Dockerfile                   FastAPI 컨테이너 이미지
-├── docker-compose.yml           FastAPI와 Ollama 로컬 실행
-├── frontend/                    Next.js 상담 UI와 FastAPI proxy
+├── frontend/                 Next.js 상담 UI와 FastAPI proxy
+├── src/chatbot/              생성기·RAG·LangGraph·FastAPI
 ├── data/
-│   ├── laws/                    법령 XML 원문과 출처 정보
-│   ├── evaluation/              RAG 개발·회귀 평가 Dataset
-│   └── index/                   로컬 Chroma 인덱스 (Git 제외)
-├── docs/
-│   ├── 01-chatbot-fastapi/      모델 생성과 FastAPI 단계
-│   ├── 02-langchain-rag/        RAG 설계·실험·파이프라인
-│   ├── 03-langsmith-evaluation/ Dataset·추적·기준선 평가
-│   ├── 04-langgraph-migration/  완료된 StateGraph 전환
-│   ├── 05-performance-improvement/ 개선 단위별 설계·적용·비교 기록
-│   ├── 06-other/                외부 데이터 기록
-│   ├── 07-langgraph-agent/      Finlife·질문 분기·Agent 확장 명세
-│   ├── 08-ci-cd-pipeline/       컨테이너와 배포 파이프라인 기록
-│   ├── 09-frontend/             Streamlit 아카이브와 Next.js UI 기록
-│   ├── 99-retrospectives/       사용자가 작성한 주차별 회고
-│   └── langfeather/             로컬 추적 연결과 검증 기록
-├── scripts/
-│   ├── collect_laws.py          법령 XML 수집
-│   ├── build_index.py           전체 법령 인덱스 재생성
-│   ├── compare_embeddings.py    임베딩 후보 비교
-│   ├── verify_index.py          Chroma 검색 결과 검증
-│   ├── register_evaluation_dataset.py  LangSmith Dataset 등록
-│   └── run_rag_evaluation.py    LangSmith 기준선 평가 실행
-├── src/chatbot/
-│   ├── main.py                  FastAPI endpoint와 앱 수명주기
-│   ├── generator.py             Hugging Face Qwen3 생성기
-│   ├── ollama_generator.py      Ollama Qwen3 생성기
-│   ├── statutes.py              XML 조문 파싱
-│   ├── chunking.py              조문 경계 기반 청킹
-│   ├── embedding.py             KURE-v1 임베딩
-│   ├── vectorstore.py           Chroma 컬렉션 접근과 검색
-│   ├── retriever.py             질문 검색과 조문 중복 제거
-│   ├── rag.py                   LCEL RAG 답변 체인
-│   ├── graph.py                 LangGraph 검색·생성 흐름
-│   ├── evaluation.py            평가용 RAG 실행 결과 구성
-│   ├── evaluators.py            검색·Faithfulness 평가
-│   └── settings.py              로컬 환경 변수 로드
-├── tests/                       단위·흐름 검증
-└── experiments/from_scratch/    별도 보관한 Transformer 학습 실험
+│   ├── laws/                 법령 XML 원문 snapshot
+│   └── evaluation/           24문항 회귀평가 Dataset
+├── scripts/                  수집·인덱싱·평가·검증 명령
+├── tests/                    backend 단위·흐름 테스트
+├── docs/                     ADR, 실험 결과와 단계별 가이드
+└── experiments/from_scratch/ 초기 Transformer 학습 실험 보관
 ```
 
-초기에 직접 구현한 Transformer 실험은 [experiments/from_scratch/](experiments/from_scratch/)에
-별도로 보관합니다. 주력 FastAPI·RAG 코드와 섞지 않습니다.
+초기 from-scratch Transformer 코드는 현재 주력 경로와 분리해
+[experiments/from_scratch](experiments/from_scratch/README.md)에 보존합니다.
+
+## 주요 문서
+
+| 문서 | 내용 |
+| --- | --- |
+| [RAG 파이프라인 개요](docs/02-langchain-rag/03-guides/01-rag-pipeline-overview.md) | 수집부터 검색·답변까지의 코드 흐름 |
+| [RAG 평가 Dataset](data/evaluation/README.md) | 24문항 구성과 지표 계약 |
+| [LangGraph 전환 결과](docs/03-langsmith-evaluation/11-langgraph-migration-results.md) | 전환 전후 회귀평가 |
+| [Structured Output v2](docs/05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md) | schema와 근거 ID 검증 |
+| [Next.js 상담 UI](docs/09-frontend/02-nextjs-chat-ui.md) | UI 범위와 스트리밍 검증 |
+| [Agent 확장 명세](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md) | Finlife부터 Agent v1까지의 순서 |
+| [README 최신 베이스라인](docs/10-project-presentation/01-readme-baseline.md) | 공개 문서 구성과 Workflow·Agent 표현 기준 |
