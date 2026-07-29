@@ -3,8 +3,10 @@
 로컬 LLM으로 한국어 금융 안내 챗봇을 만들며, 생성 모델 서빙부터 법령 RAG와
 LangGraph까지 단계적으로 익히는 프로젝트입니다. 현재 법령 검색·생성 흐름의
 LangGraph 전환과 회귀 평가를 마쳤고, 법령 답변에 Structured Output과 검색 근거
-검증을 적용했습니다. 다음에는 금융상품 한눈에 API의 정기예금 호출 함수를 구현하고,
-법령·상품·혼합 질문을 구분하는 Workflow와 Tool Agent로 단계적으로 확장합니다.
+검증을 적용했습니다. Next.js 상담 UI와 로컬 추적 화면으로 실제 응답 흐름을 확인할
+수 있으며, Docker·EC2·GitHub Actions 배포 실습의 기본 파일도 마련했습니다. 다음에는
+금융상품 한눈에 API의 정기예금 호출 함수를 구현하고, 법령·상품·혼합 질문을 구분하는
+Workflow와 Tool Agent로 단계적으로 확장합니다.
 
 > 이 프로젝트의 답변은 학습·시연용입니다. 최신 법령, 개별 상품의 보호 여부,
 > 금융 의사결정은 반드시 공식 공시와 관계 기관 정보를 다시 확인해야 합니다.
@@ -15,10 +17,13 @@ LangGraph 전환과 회귀 평가를 마쳤고, 법령 답변에 Structured Outp
 | --- | --- |
 | 생성 모델 | Qwen3-4B-Instruct-2507 · 기본 실행은 Ollama q4_K_M |
 | API | 법령 RAG의 JSON·텍스트 응답 제공 |
+| UI | Next.js 16 · React 19 · FastAPI 스트리밍 프록시 |
 | 실행 흐름 | LangGraph `retrieve → generate` · 생성 Node 안에서 LCEL 재사용 |
 | RAG 데이터 | 금융소비자보호법·예금자보호법과 각 시행령, 총 4건 |
 | 검색 | KURE-v1 임베딩(1024차원) · Chroma 벡터스토어 |
 | 평가 | LangSmith 24문항 · LangChain/LangGraph 검색 지표 동일 · 실행 오류 0건 |
+| 추적 | LangSmith · 선택적 LangFeather 로컬 대시보드 |
+| 배포 | FastAPI·Ollama Docker Compose와 GitHub Actions·EC2 배포 뼈대 |
 | 다음 확인 | Finlife 은행권 정기예금 1페이지 호출 함수 |
 | 검증 | pytest와 임베딩·인덱스 재현 스크립트 |
 
@@ -26,8 +31,9 @@ LangGraph 전환과 회귀 평가를 마쳤고, 법령 답변에 Structured Outp
 
 ```mermaid
 flowchart LR
-    U[사용자 질문] --> UI[Streamlit 채팅 UI]
-    UI --> API[FastAPI]
+    U[사용자 질문] --> UI[Next.js 상담 UI]
+    UI --> PX[Next.js API proxy]
+    PX --> API[FastAPI]
 
     API --> R["/ask-rag · /ask-rag/stream"]
     R --> LG[LangGraph]
@@ -62,11 +68,13 @@ orchestrator 역할을 맡습니다.
 - KURE-v1 모델 비교·선정과 Chroma 인덱스 생성
 - 질문 임베딩 → 조문 검색 → LCEL 답변 생성의 최소 RAG 흐름
 - LangGraph `retrieve → generate` StateGraph와 FastAPI 연결
-- Streamlit 기반 법령 RAG 채팅·스트리밍 화면
+- Next.js 기반 상담 UI와 FastAPI 스트리밍 프록시
 - LangSmith 24문항 LangChain 기준선과 LangGraph 전환 평가
 - 전환 전후 검색 `precision_top_5=0.280`, `recall_top_5=0.711` 유지
 - Ollama JSON Schema·Pydantic 검증과 검색 근거 ID 기반 RAG 응답 v2
+- LangSmith와 독립적으로 켤 수 있는 LangFeather 로컬 LangGraph 추적
 - Finlife 인증키 환경 변수와 공식 API 정상·본문 오류 응답 계약 확인
+- FastAPI·Ollama Docker Compose와 GitHub Actions·EC2 배포 파일 구성
 
 ## 다음에 이어갈 범위
 
@@ -89,7 +97,8 @@ Agent 점수에 합치지 않고 법령 검색·답변 경로의 회귀 평가�
 
 ### 1. 환경 준비
 
-Python 3.13과 [uv](https://docs.astral.sh/uv/)를 사용합니다.
+backend는 Python 3.13과 [uv](https://docs.astral.sh/uv/)를 사용합니다. Next.js
+상담 UI에는 Node.js 20.9 이상과 npm이 필요합니다.
 
 ```bash
 uv sync --locked
@@ -146,12 +155,41 @@ RAG endpoint는 지원하지 않습니다.
 FastAPI 서버를 켜 둔 상태에서 새 터미널을 열어 실행합니다.
 
 ```bash
-uv run streamlit run streamlit_app.py
+cd frontend
+npm ci
+npm run dev
 ```
 
-브라우저에서 `http://localhost:8501`을 열면 법령 RAG 답변을 채팅 형태로 확인할
-수 있습니다. 화면에는 이전 메시지가 남지만, 현재 모델은 질문 사이의 문맥을 기억하지
-않습니다.
+브라우저에서 `http://localhost:3000`을 열면 법령 RAG 답변을 채팅 형태로 확인할
+수 있습니다. `3000`은 Next.js 개발 서버의 기본 포트이며 FastAPI의 `8000`과
+구분됩니다. 현재 모델은 질문 사이의 문맥을 기억하지 않습니다.
+
+### 5. 선택적 로컬 추적
+
+기본 실행에는 LangFeather가 필요하지 않습니다. 로컬 Docker 대시보드에서
+LangGraph의 `retrieve → generate` 실행을 확인할 때만 다음 환경 변수를 사용합니다.
+
+```bash
+LANGFEATHER_ENABLED=true \
+LANGFEATHER_ENDPOINT=http://127.0.0.1:4319 \
+uv run fastapi dev
+```
+
+LangFeather 컨테이너 준비와 종료 방법은
+[LangFeather 개인 실행 안내](docs/langfeather/01-local-setup.md)를 따릅니다.
+LangSmith 평가 연결은 그대로 유지되며, 두 추적 기능은 서로 대체하지 않습니다.
+
+## 컨테이너와 배포 상태
+
+루트 `Dockerfile`은 FastAPI 이미지를 만들고, `docker-compose.yml`은 FastAPI와
+Ollama를 함께 실행합니다. `.github/workflows/deploy.yml`에는 pytest, Docker Hub
+이미지 push, EC2 재시작 순서가 정의되어 있습니다.
+
+현재 저장소에는 실행 뼈대와 재현 순서가 있으며, 실제 EC2 환경의 secret·모델·Chroma
+인덱스 준비와 외부 접속 검증은 사용자 환경에서 완료해야 합니다. Next.js UI는 아직
+Docker Compose와 배포 workflow에 포함하지 않습니다. 단계별 명령은
+[Docker·EC2·GitHub Actions 실습 순서](docs/08-ci-cd-pipeline/01-challenge-workflow.md)에
+정리되어 있습니다.
 
 ## API 사용 예시
 
@@ -231,6 +269,9 @@ uv run python scripts/verify_index.py
 | [성능 개선 기록](docs/05-performance-improvement/README.md) | 지연시간·응답 신뢰성 개선 단위와 현재 상태 |
 | [RAG Structured Output v2 설계](docs/05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md) | schema·근거 검증·렌더링 적용과 비교 계획 |
 | [Finlife·Agent 확장 명세](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md) | 현재부터 적용할 구현·평가 순서 |
+| [Docker·EC2·GitHub Actions 실습](docs/08-ci-cd-pipeline/01-challenge-workflow.md) | 컨테이너부터 자동 배포까지의 단계 |
+| [Next.js 상담 UI](docs/09-frontend/02-nextjs-chat-ui.md) | Streamlit 교체 범위와 스트리밍 UI 검증 |
+| [LangFeather 로컬 추적](docs/langfeather/README.md) | LangSmith와 독립적인 로컬 trace 구조와 실행 문서 |
 
 계획 문서는 작성 당시의 질문을 보존하므로 미래 항목이 서로 다르게 보일 수 있습니다.
 현재 우선순위는 다음과 같습니다.
@@ -247,8 +288,10 @@ uv run python scripts/verify_index.py
 
 ```text
 korean-chatbot/
-├── .streamlit/config.toml       Streamlit 색상·화면 설정
-├── streamlit_app.py             법령 RAG 채팅·스트리밍 UI
+├── .github/workflows/           pytest·Docker Hub·EC2 배포 workflow
+├── Dockerfile                   FastAPI 컨테이너 이미지
+├── docker-compose.yml           FastAPI와 Ollama 로컬 실행
+├── frontend/                    Next.js 상담 UI와 FastAPI proxy
 ├── data/
 │   ├── laws/                    법령 XML 원문과 출처 정보
 │   ├── evaluation/              RAG 개발·회귀 평가 Dataset
@@ -259,8 +302,12 @@ korean-chatbot/
 │   ├── 03-langsmith-evaluation/ Dataset·추적·기준선 평가
 │   ├── 04-langgraph-migration/  완료된 StateGraph 전환
 │   ├── 05-performance-improvement/ 개선 단위별 설계·적용·비교 기록
-│   ├── 06-other/                외부 데이터와 UI 기록
-│   └── 07-langgraph-agent/      Finlife·질문 분기·Agent 확장 명세
+│   ├── 06-other/                외부 데이터 기록
+│   ├── 07-langgraph-agent/      Finlife·질문 분기·Agent 확장 명세
+│   ├── 08-ci-cd-pipeline/       컨테이너와 배포 파이프라인 기록
+│   ├── 09-frontend/             Streamlit 아카이브와 Next.js UI 기록
+│   ├── 99-retrospectives/       사용자가 작성한 주차별 회고
+│   └── langfeather/             로컬 추적 연결과 검증 기록
 ├── scripts/
 │   ├── collect_laws.py          법령 XML 수집
 │   ├── build_index.py           전체 법령 인덱스 재생성

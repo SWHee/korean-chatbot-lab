@@ -185,7 +185,7 @@ answer
 - 응답: `response`, `route`, 법령 출처, 상품 출처, 시간, 부분 실패
 - 검증: FastAPI 정상 1건과 중요한 실패 1건
 - 유지: `/ask-rag`, `/ask-rag/stream`
-- 제외: Streamlit 전환과 Agent 스트리밍
+- 제외: Next.js UI 연결과 Agent 스트리밍
 
 ### 11. Qwen Tool call 단독 확인
 
@@ -231,7 +231,7 @@ Agent Tool은 생성된 법령 답변이 아니라 검색 조문과 정규화 �
 Agent POC가 느리거나 Tool 선택이 불안정하면 Routed Workflow v1을 기본 경로로
 유지한다.
 
-### 15. Agent 스트리밍과 Streamlit
+### 15. Agent 스트리밍과 Next.js
 
 - 목표: Tool 진행 상태와 최종 답변을 UI에서 구분
 - 순서: 비스트리밍 계약 확인 후 별도 endpoint 추가

@@ -72,10 +72,11 @@ curl -X POST http://127.0.0.1:8000/ask-rag \
   -d '{"question":"은행이 파산하면 예금은 얼마까지 보호되나요?"}'
 ```
 
-Streamlit UI를 사용하려면 FastAPI를 켜 둔 채 다른 터미널에서 실행한다.
+채팅 UI를 사용하려면 FastAPI를 켜 둔 채 다른 터미널에서 실행한다.
 
 ```bash
-uv run streamlit run streamlit_app.py
+cd frontend
+npm run dev
 ```
 
 질문이 끝난 뒤 LangFeather 화면을 새로고침하고
