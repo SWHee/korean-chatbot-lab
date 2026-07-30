@@ -277,7 +277,7 @@ def stream_answer_question(
 
     rendered_answer = render_rag_answer(structured_answer, articles)
     if not streamed_answer:
-        yield rendered_answer
+        yield from rendered_answer.splitlines(keepends=True)
         return
 
     if not rendered_answer.startswith(streamed_answer):

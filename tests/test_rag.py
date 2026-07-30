@@ -297,7 +297,7 @@ def test_stream_answer_question_yields_answer_chunks_and_validated_source() -> N
 
 
 def test_stream_answer_question_uses_fixed_message_when_evidence_is_insufficient() -> None:
-    """답변 불가 구조화 결과에서 고정 안내 한 조각 전달"""
+    """답변 불가 구조화 결과에서 고정 안내를 여러 조각으로 전달"""
     generator = FakeGenerator(
         rag_module.RagAnswer(
             can_answer=False,
@@ -314,7 +314,8 @@ def test_stream_answer_question_uses_fixed_message_when_evidence_is_insufficient
         )
     )
 
-    assert chunks == [rag_module.INSUFFICIENT_EVIDENCE_MESSAGE]
+    assert len(chunks) > 1
+    assert "".join(chunks) == rag_module.INSUFFICIENT_EVIDENCE_MESSAGE
 
 
 def test_stream_answer_question_does_not_expose_unknown_source_answer() -> None:
@@ -343,4 +344,5 @@ def test_stream_answer_question_does_not_expose_unknown_source_answer() -> None:
         )
     )
 
-    assert chunks == [rag_module.INSUFFICIENT_EVIDENCE_MESSAGE]
+    assert len(chunks) > 1
+    assert "".join(chunks) == rag_module.INSUFFICIENT_EVIDENCE_MESSAGE
