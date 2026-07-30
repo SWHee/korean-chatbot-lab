@@ -1,11 +1,11 @@
 # 외부 데이터와 API
 
 - 작성일: 2026-07-09
-- Finlife 계약 확인: 2026-07-24
+- Finlife 계약 확인: 2026-07-24, 적금 추가 확인: 2026-07-30
 
 이 프로젝트는 외부 데이터를 두 가지 성격으로 나누어 사용한다. 법령 데이터는 이미
 RAG corpus로 수집했고, 금융상품 한눈에 API는 인증키와 실제 응답 계약까지 확인했다.
-Finlife 호출 함수와 LangGraph 연결은 아직 구현하지 않았다.
+예·적금 호출 함수와 정기예금 비교 로직까지 구현했으며 LangGraph 연결은 아직이다.
 
 ## 국가법령정보 Open API
 
@@ -37,8 +37,9 @@ Finlife 호출 함수와 LangGraph 연결은 아직 구현하지 않았다.
 - 사용 용도: WEB
 - 사용 URL: `http://127.0.0.1:8000`
 - 환경 변수 예시: `FINLIFE_API_KEY=<발급받은 인증키>`
-- 첫 확인 endpoint:
-  `GET https://finlife.fss.or.kr/finlifeapi/depositProductsSearch.json`
+- 확인한 endpoint:
+  - `GET https://finlife.fss.or.kr/finlifeapi/depositProductsSearch.json`
+  - `GET https://finlife.fss.or.kr/finlifeapi/savingProductsSearch.json`
 
 API 호출은 FastAPI backend에서 처리하는 방향이 자연스럽다. 나중에 Streamlit을
 붙이더라도 인증키는 화면 코드에 넣지 않고 `.env`나 backend 설정에서만 다룬다.
@@ -53,6 +54,10 @@ API 호출은 FastAPI backend에서 처리하는 방향이 자연스럽다. 나�
 금리 옵션 152건이 반환됐다. 이 건수와 금리는 공시가 바뀌면 달라질 수 있으므로
 고정된 제품 요구사항으로 사용하지 않는다.
 
+2026-07-30에는 같은 권역의 적금 1페이지를 호출해 기본 상품 58건과 금리 옵션
+181건을 확인했다. 기본정보 필드는 정기예금과 같았고, 적금 옵션에는 적립 방식을
+구분하는 `rsrv_type`, `rsrv_type_nm`이 추가로 있었다.
+
 응답의 `result`는 다음 구조였다.
 
 | 구분 | 확인한 필드 |
@@ -66,6 +71,10 @@ API 호출은 FastAPI backend에서 처리하는 방향이 자연스럽다. 나�
 `optionList`에는 저축 기간과 기본금리 `intr_rate`, 최고 우대금리 `intr_rate2`가
 있었다. 기본정보의 `max_limit`와 `dcls_end_day`는 일부 상품에서 `null`이었으므로
 항상 값이 있다고 가정하면 안 된다.
+
+인증, 권역, 페이지, 본문 오류 처리는 예·적금 호출에서 공통으로 사용한다. 다만
+적금의 적립 방식은 비교에 필요한 정보이므로 정기예금 정규화 모델에 누락한 채
+합치지 않는다.
 
 이 필드명은 Finlife가 정한 원본 응답 계약이므로 외부 요청과 응답을 읽는
 경계에서만 사용한다. 상품 정규화 단계부터는 프로젝트에서 뜻을 바로 알 수 있는
@@ -89,8 +98,8 @@ API 응답에서 Finlife 약어를 직접 사용하지 않는다.
 `err_cd=101`, `topFinGrpNo의 부적절한 값`을 반환했다. 따라서 구현은 HTTP 성공만
 확인하지 않고 `result.err_cd == "000"`도 검사해야 한다.
 
-첫 구현은 이 정상 경로와 본문 오류 한 건만 다룬다. 전체 페이지 순회, 적금 endpoint,
-금리 정렬, 상품 추천, Graph 연결은 같은 작업에 넣지 않는다. 이후 순서는
+현재 구현은 예·적금 1페이지 호출과 본문 오류 처리, 정기예금 정규화·정렬까지
+다룬다. 전체 페이지 순회, 적금 정규화, 상품 답변과 Graph 연결은 이후 순서인
 [Finlife에서 LangGraph Agent까지 확장 명세](../07-langgraph-agent/01-finlife-agent-expansion-spec.md)를
 기준으로 한다.
 
