@@ -6,7 +6,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from time import perf_counter
 
-import langfeather
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -20,6 +19,17 @@ from chatbot.vectorstore import open_collection
 
 LANGFEATHER_TRACE_NAME = "korean-chatbot-rag"
 LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS = 2.0
+
+
+def load_langfeather():
+    """선택적 로컬 추적 SDK 로드"""
+    try:
+        import langfeather
+    except ModuleNotFoundError as error:
+        raise RuntimeError(
+            "LangFeather 추적에는 'uv sync --group tracing'이 필요합니다."
+        ) from error
+    return langfeather
 
 
 class RagRequest(BaseModel):
@@ -62,13 +72,15 @@ def prepare_rag_resources(app: FastAPI) -> None:
             os.getenv("LANGFEATHER_ENABLED", "false").strip().lower() == "true"
         )
         if app.state.langfeather_enabled:
-            langfeather.configure(
+            langfeather_sdk = load_langfeather()
+            langfeather_sdk.configure(
                 endpoint=os.getenv("LANGFEATHER_ENDPOINT") or None,
             )
-            rag_graph = langfeather.wrap_runnable(
+            rag_graph = langfeather_sdk.wrap_runnable(
                 rag_graph,
                 name=LANGFEATHER_TRACE_NAME,
             )
+            app.state.langfeather_sdk = langfeather_sdk
         app.state.rag_graph = rag_graph
 
 
@@ -89,9 +101,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        if getattr(app.state, "langfeather_enabled", False):
+        langfeather_sdk = getattr(app.state, "langfeather_sdk", None)
+        if getattr(app.state, "langfeather_enabled", False) and langfeather_sdk:
             await asyncio.to_thread(
-                langfeather.shutdown,
+                langfeather_sdk.shutdown,
                 timeout=LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS,
             )
         for name in (
@@ -100,6 +113,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "collection",
             "rag_graph",
             "langfeather_enabled",
+            "langfeather_sdk",
         ):
             if hasattr(app.state, name):
                 delattr(app.state, name)

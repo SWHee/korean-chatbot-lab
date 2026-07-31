@@ -6,7 +6,7 @@
 
 - Docker Desktop 실행
 - LangFeather 저장소 clone
-- Korean Chatbot 저장소의 `uv sync` 완료
+- Korean Chatbot 저장소의 `uv sync --group tracing` 완료
 
 계정이나 API key는 필요하지 않다. Docker image를 처음 만들 때만 image와
 dependency를 내려받기 위한 인터넷 연결이 필요하다. Korean Chatbot의 LangFeather
@@ -15,7 +15,7 @@ SDK는 `uv.lock`에 고정되어 있으므로 새 사용자는 별도의 `uv add
 
 ```bash
 cd /path/to/korean-chatbot
-uv sync
+uv sync --group tracing
 ```
 
 ## 2. 로컬 대시보드 시작
@@ -48,7 +48,7 @@ LANGSMITH_TRACING=false \
 LANGCHAIN_TRACING_V2=false \
 LANGFEATHER_ENABLED=true \
 LANGFEATHER_ENDPOINT=http://127.0.0.1:4319 \
-uv run fastapi dev
+uv run --group tracing fastapi dev
 ```
 
 두 LangSmith 변수를 함께 끄는 이유는 이번 확인에서 로컬 LangFeather 기록과

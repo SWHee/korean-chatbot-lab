@@ -72,6 +72,7 @@ def test_prepare_rag_resources_wraps_graph_when_langfeather_enabled(
     )
     configured_endpoints = []
     wrapped_graphs = []
+    langfeather_sdk = SimpleNamespace()
 
     monkeypatch.setenv("LANGFEATHER_ENABLED", "true")
     monkeypatch.setenv("LANGFEATHER_ENDPOINT", "http://127.0.0.1:4319")
@@ -81,24 +82,22 @@ def test_prepare_rag_resources_wraps_graph_when_langfeather_enabled(
         lambda **resources: rag_graph,
     )
     monkeypatch.setattr(
-        main_module.langfeather,
-        "configure",
-        lambda endpoint: configured_endpoints.append(endpoint),
+        main_module,
+        "load_langfeather",
+        lambda: langfeather_sdk,
     )
+    langfeather_sdk.configure = lambda endpoint: configured_endpoints.append(endpoint)
 
     def fake_wrap_runnable(runnable, *, name):
         wrapped_graphs.append((runnable, name))
         return traced_graph
 
-    monkeypatch.setattr(
-        main_module.langfeather,
-        "wrap_runnable",
-        fake_wrap_runnable,
-    )
+    langfeather_sdk.wrap_runnable = fake_wrap_runnable
 
     main_module.prepare_rag_resources(app)
 
     assert app.state.langfeather_enabled is True
+    assert app.state.langfeather_sdk is langfeather_sdk
     assert app.state.rag_graph is traced_graph
     assert configured_endpoints == ["http://127.0.0.1:4319"]
     assert wrapped_graphs == [(rag_graph, "korean-chatbot-rag")]
@@ -138,15 +137,13 @@ def test_lifespan_shuts_down_enabled_langfeather(monkeypatch) -> None:
         app = SimpleNamespace(state=state)
         async with main_module.lifespan(app):
             app.state.langfeather_enabled = True
+            app.state.langfeather_sdk = SimpleNamespace(
+                shutdown=lambda timeout: shutdown_timeouts.append(timeout) or True
+            )
 
     monkeypatch.setenv("CHATBOT_BACKEND", "ollama")
     monkeypatch.setattr(main_module, "load_local_env", lambda: None)
     monkeypatch.setattr(main_module, "OllamaGenerator", FakeOllamaGenerator)
-    monkeypatch.setattr(
-        main_module.langfeather,
-        "shutdown",
-        lambda timeout: shutdown_timeouts.append(timeout) or True,
-    )
 
     asyncio.run(run_lifespan())
 

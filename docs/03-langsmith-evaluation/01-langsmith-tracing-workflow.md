@@ -66,7 +66,7 @@ OpenAI quickstart 예제의 모델과 패키지를 그대로 사용하지 않는
 ### Dataset 등록
 
 ```bash
-uv run python scripts/register_evaluation_dataset.py
+uv run --group evaluation python scripts/register_evaluation_dataset.py
 ```
 
 질문은 Inputs, `reference_answer`는 Reference Outputs로 등록한다. 정답 조문과 지표
@@ -75,7 +75,7 @@ uv run python scripts/register_evaluation_dataset.py
 ### 한 문항 확인
 
 ```bash
-uv run python scripts/run_rag_evaluation.py --question-ids A1
+uv run --group evaluation python scripts/run_rag_evaluation.py --question-ids A1
 ```
 
 처음에는 입력, 답변, 검색 출처와 세 평가 Feedback이 보이는지만 확인한다. 모델과
@@ -85,8 +85,8 @@ uv run python scripts/run_rag_evaluation.py --question-ids A1
 ### 선택 문항 또는 전체 실행
 
 ```bash
-uv run python scripts/run_rag_evaluation.py --question-ids A1 A2 A3 A4 A5
-uv run python scripts/run_rag_evaluation.py --all
+uv run --group evaluation python scripts/run_rag_evaluation.py --question-ids A1 A2 A3 A4 A5
+uv run --group evaluation python scripts/run_rag_evaluation.py --all
 ```
 
 `max_concurrency=1`로 한 요청씩 실행한다. 로컬 모델 부하를 줄이려면 문항 ID를 여러
