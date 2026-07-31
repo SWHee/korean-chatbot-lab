@@ -2,7 +2,7 @@ import uuid
 
 import chromadb
 
-from chatbot.vectorstore import search
+from chatbot.vectorstore import resolve_index_dir, search
 
 
 def make_collection():
@@ -37,3 +37,13 @@ def test_search_top_k_order() -> None:
     result = search(make_collection(), [0.3, 1.0], top_k=2)
     assert [r["article_no"] for r in result] == ["제2조", "제1조"]
     assert result[0]["similarity"] >= result[1]["similarity"]
+
+
+def test_resolve_index_dir_uses_environment(
+    monkeypatch, tmp_path
+) -> None:
+    """컨테이너에서 지정한 인덱스 경로 우선"""
+    index_dir = tmp_path / "chroma"
+    monkeypatch.setenv("CHATBOT_INDEX_DIR", str(index_dir))
+
+    assert resolve_index_dir() == index_dir

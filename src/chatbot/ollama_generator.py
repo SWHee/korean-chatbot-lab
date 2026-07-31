@@ -13,7 +13,7 @@ from pydantic_core import from_json
 MODEL_ID = "qwen3:4b-instruct-2507-q4_K_M"
 BASE_URL = "http://localhost:11434"
 MAX_NEW_TOKENS = 1024  # Ollama backend 생성 길이 상한
-TIMEOUT_SECONDS = 60.0
+TIMEOUT_SECONDS = 300.0
 StructuredResponse = TypeVar("StructuredResponse", bound=BaseModel)
 
 
@@ -22,6 +22,9 @@ class OllamaGenerator:
 
     def __init__(self) -> None:
         self.base_url = os.getenv("OLLAMA_BASE_URL", BASE_URL)
+        self.timeout_seconds = float(
+            os.getenv("OLLAMA_TIMEOUT_SECONDS", str(TIMEOUT_SECONDS))
+        )
 
     def _chat_payload(self, prompt: str, stream: bool) -> dict:
         """Ollama chat API 요청 본문 구성"""
@@ -37,7 +40,7 @@ class OllamaGenerator:
         response = httpx.post(
             f"{self.base_url}/api/chat",
             json=self._chat_payload(prompt, stream=False),
-            timeout=TIMEOUT_SECONDS,
+            timeout=self.timeout_seconds,
         )
         response.raise_for_status()
         return response.json()["message"]["content"]
@@ -56,7 +59,7 @@ class OllamaGenerator:
                 response_model=response_model,
                 stream=False,
             ),
-            timeout=TIMEOUT_SECONDS,
+            timeout=self.timeout_seconds,
         )
         response.raise_for_status()
         return response_model.model_validate_json(
@@ -80,7 +83,7 @@ class OllamaGenerator:
                 response_model=response_model,
                 stream=True,
             ),
-            timeout=TIMEOUT_SECONDS,
+            timeout=self.timeout_seconds,
         ) as response:
             response.raise_for_status()
 
@@ -133,7 +136,7 @@ class OllamaGenerator:
             "POST",
             f"{self.base_url}/api/chat",
             json=self._chat_payload(prompt, stream=True),
-            timeout=TIMEOUT_SECONDS,
+            timeout=self.timeout_seconds,
         ) as response:
             response.raise_for_status()
 

@@ -5,9 +5,11 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.15 /uv /uvx /bin/
 WORKDIR /app
 
 COPY . .
-RUN uv sync --locked --no-dev
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --no-editable
 
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 

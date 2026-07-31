@@ -144,6 +144,15 @@ def test_generator_reads_ollama_base_url(monkeypatch) -> None:
     assert generator.base_url == "http://ollama:11434"
 
 
+def test_generator_reads_ollama_timeout(monkeypatch) -> None:
+    """느린 CPU 추론을 위한 환경별 제한 시간"""
+    monkeypatch.setenv("OLLAMA_TIMEOUT_SECONDS", "180")
+
+    generator = ollama_module.OllamaGenerator()
+
+    assert generator.timeout_seconds == 180.0
+
+
 def test_generate_structured_rejects_invalid_response(monkeypatch) -> None:
     """schema를 만족하지 않는 모델 응답 거부"""
     monkeypatch.setattr(

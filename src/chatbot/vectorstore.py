@@ -1,16 +1,26 @@
 """법령 청크 벡터스토어 접근 (ADR 0006: Chroma)"""
 
+import os
 from pathlib import Path
 
 import chromadb
 
-INDEX_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "index" / "chroma"
+DEFAULT_INDEX_DIR = (
+    Path(__file__).resolve().parent.parent.parent / "data" / "index" / "chroma"
+)
 COLLECTION_NAME = "statutes"
 
 
-def open_collection(index_dir: str | Path = INDEX_DIR):
+def resolve_index_dir() -> Path:
+    """실행 환경별 Chroma 인덱스 경로"""
+    configured_dir = os.getenv("CHATBOT_INDEX_DIR")
+    return Path(configured_dir) if configured_dir else DEFAULT_INDEX_DIR
+
+
+def open_collection(index_dir: str | Path | None = None):
     """persist된 인덱스 컬렉션 열기"""
-    client = chromadb.PersistentClient(path=str(index_dir))
+    resolved_dir = Path(index_dir) if index_dir is not None else resolve_index_dir()
+    client = chromadb.PersistentClient(path=str(resolved_dir))
     return client.get_collection(COLLECTION_NAME)
 
 

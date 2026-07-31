@@ -15,12 +15,13 @@ import chromadb
 from chatbot.chunking import chunk_articles
 from chatbot.embedding import load_encoder, embed_texts
 from chatbot.statutes import parse_law
-from chatbot.vectorstore import COLLECTION_NAME, INDEX_DIR
+from chatbot.vectorstore import COLLECTION_NAME, resolve_index_dir
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "laws"
 
 
 def main() -> None:
+    index_dir = resolve_index_dir()
     articles = []
     for f in sorted(DATA_DIR.glob("*.xml")):
         articles += parse_law(f)
@@ -30,7 +31,7 @@ def main() -> None:
     encoder = load_encoder()
     vectors = embed_texts(encoder, [c.text for c in chunks])
 
-    client = chromadb.PersistentClient(path=str(INDEX_DIR))
+    client = chromadb.PersistentClient(path=str(index_dir))
     if any(c.name == COLLECTION_NAME for c in client.list_collections()):
         client.delete_collection(COLLECTION_NAME)
     collection = client.create_collection(
@@ -51,7 +52,7 @@ def main() -> None:
             for c in chunks
         ],
     )
-    print(f"인덱싱 완료: {collection.count()}개 청크 → {INDEX_DIR}", flush=True)
+    print(f"인덱싱 완료: {collection.count()}개 청크 → {index_dir}", flush=True)
 
 
 if __name__ == "__main__":
