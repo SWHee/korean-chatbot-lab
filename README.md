@@ -98,42 +98,27 @@ client**입니다. 배포 트랙에서는 Next.js 이미지를 포함한 전체 
 
 ## 아키텍처
 
-```mermaid
-flowchart LR
-    U[사용자] --> UI[Next.js 상담 UI]
-    UI --> PX[Next.js API proxy]
-    PX --> API[FastAPI]
+<p align="center">
+  <a href="docs/assets/architecture-overview.svg">
+    <img
+      src="docs/assets/architecture-overview.svg"
+      alt="Next.js, FastAPI, LangGraph 2노드 Workflow, Chroma, Ollama와 오프라인 법령 인덱싱으로 구성된 현재 아키텍처"
+      width="100%"
+    />
+  </a>
+</p>
 
-    API --> LG[LangGraph]
-    LG --> RT[retrieve]
-    RT --> EM[KURE-v1]
-    EM --> VS[(Chroma)]
-    VS --> RT
-    RT --> GN[generate]
-    GN --> LC[LCEL prompt]
-    LC --> OL[Ollama · Qwen3]
-    GN --> API
-
-    XML[법령 XML 4건] --> PS[조문 파싱·청킹]
-    PS --> IX[임베딩·인덱싱]
-    IX --> VS
-```
+설계도는 **현재 실행 기준선만** 표시합니다. 큰 점선 경계 안은 이 저장소가 소유하는
+애플리케이션과 데이터이며, 실선은 온라인 호출, 점선은 오프라인 인덱싱·선택적 추적,
+녹색 선은 검증된 응답 경로입니다. LangGraph 영역 안의 `retrieve → generate`는
+현재 순서가 고정된 2노드 Workflow이며 미래 Finlife Tool과 Agent loop는 섞지
+않았습니다.
 
 프로젝트가 소유하는 생성기 경계가 Ollama와 Hugging Face 구현을 감쌉니다. 현재
 법령 RAG v2는 Ollama의 native JSON Schema를 사용하며, Hugging Face backend는
 기존 직접 추론 흐름을 확인하기 위한 선택적 구현으로 남아 있습니다.
 
-### 데이터 흐름
-
-```text
-법령 XML
-  → 조문 파싱
-  → 조문 경계를 보존한 청킹
-  → KURE-v1 1024차원 임베딩
-  → Chroma 인덱스
-  → 질문과 가까운 상위 조문 검색
-  → 구조화된 근거 답변
-```
+### 데이터 범위
 
 현재 corpus는 금융소비자보호법·예금자보호법과 각 시행령 4건입니다. 인덱싱
 기준으로 **260개 조문, 322개 청크**를 사용하며 원문 snapshot과 수집 방법은
@@ -186,6 +171,13 @@ npm run dev
 `POST /api/chat`을 호출하고, 서버 측 프록시는 FastAPI의 응답 스트림을 그대로
 전달합니다.
 
+의존성을 한 번 준비한 뒤에는 다음 명령으로 FastAPI와 Next.js 개발 서버를 함께
+실행할 수 있습니다.
+
+```bash
+./scripts/run.sh
+```
+
 ## API
 
 | Method | Endpoint | 설명 |
@@ -226,7 +218,8 @@ curl -N -X POST http://127.0.0.1:8000/ask-rag/stream \
 
 기본 생성 backend는 Ollama이며 `OLLAMA_BASE_URL`의 기본값은
 `http://localhost:11434`입니다. 로컬 `.env`에서 LangSmith와 선택적 LangFeather
-추적을 설정할 수 있습니다.
+추적을 설정할 수 있습니다. LangFeather를 사용할 때만
+`uv sync --group tracing`으로 선택 의존성을 준비합니다.
 
 ```dotenv
 LANGSMITH_TRACING=true

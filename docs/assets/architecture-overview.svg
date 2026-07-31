@@ -1,0 +1,212 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-labelledby="diagram-title diagram-desc">
+  <title id="diagram-title">Korean Chatbot Lab current runtime and data architecture</title>
+  <desc id="diagram-desc">
+    A browser user sends a question through a Next.js web application and FastAPI
+    to a deterministic LangGraph retrieve and generate workflow. The workflow
+    queries a Chroma index with KURE-v1 and generates a validated answer through
+    Ollama Qwen3. An offline pipeline builds the index from four law XML snapshots.
+    LangSmith and LangFeather observability are optional.
+  </desc>
+
+  <defs>
+    <pattern id="paper-lines" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="20" stroke="#18211d" stroke-opacity=".035" stroke-width="1"/>
+    </pattern>
+    <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#18211d" flood-opacity=".12"/>
+    </filter>
+    <marker id="arrow-ink" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#31413a"/>
+    </marker>
+    <marker id="arrow-accent" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0c5948"/>
+    </marker>
+    <style>
+      .sans { font-family: Inter, "Segoe UI", Arial, sans-serif; }
+      .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+      .eyebrow { fill: #0c5948; font-size: 14px; font-weight: 800; letter-spacing: 2.4px; }
+      .title { fill: #18211d; font-size: 42px; font-weight: 760; letter-spacing: -1.2px; }
+      .subtitle { fill: #647069; font-size: 17px; font-weight: 500; }
+      .boundary-label { fill: #647069; font-size: 12px; font-weight: 800; letter-spacing: 1.8px; }
+      .type { fill: #0c5948; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; }
+      .card-title { fill: #18211d; font-size: 24px; font-weight: 760; letter-spacing: -.35px; }
+      .card-copy { fill: #647069; font-size: 14px; font-weight: 520; }
+      .small-copy { fill: #647069; font-size: 12px; font-weight: 520; }
+      .pill-text { fill: #31413a; font-size: 11px; font-weight: 750; letter-spacing: .2px; }
+      .step-index { fill: #0c5948; font-size: 12px; font-weight: 850; letter-spacing: 1.2px; }
+      .step-title { fill: #18211d; font-size: 18px; font-weight: 760; }
+      .edge-label { fill: #647069; font-size: 11px; font-weight: 700; letter-spacing: .2px; }
+      .legend { fill: #647069; font-size: 11px; font-weight: 650; }
+      .card { fill: #fbfaf5; stroke: #aeb8b1; stroke-width: 1.25; }
+      .card-strong { fill: #f8f6ef; stroke: #18211d; stroke-width: 1.5; }
+      .card-accent { fill: #e8eee9; stroke: #0c5948; stroke-width: 1.5; }
+      .runtime-line { fill: none; stroke: #31413a; stroke-width: 2; marker-end: url(#arrow-ink); }
+      .response-line { fill: none; stroke: #0c5948; stroke-width: 2.5; marker-end: url(#arrow-accent); }
+      .secondary-line { fill: none; stroke: #78867f; stroke-width: 1.7; stroke-dasharray: 7 7; marker-end: url(#arrow-ink); }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#18211d"/>
+  <rect x="18" y="18" width="1564" height="964" rx="30" fill="#f4f1e9"/>
+  <rect x="18" y="18" width="1564" height="964" rx="30" fill="url(#paper-lines)"/>
+  <rect x="38" y="38" width="1524" height="924" rx="20" fill="none" stroke="#647069" stroke-opacity=".55"/>
+
+  <g fill="none" stroke="#0c5948" stroke-width="2">
+    <path d="M38 88 V38 H88"/>
+    <path d="M1512 38 H1562 V88"/>
+    <path d="M38 912 V962 H88"/>
+    <path d="M1512 962 H1562 V912"/>
+  </g>
+
+  <g class="sans">
+    <rect x="68" y="62" width="198" height="30" rx="15" fill="#e1e9e2" stroke="#0c5948"/>
+    <circle cx="87" cy="77" r="4" fill="#0c5948"/>
+    <text x="101" y="82" class="eyebrow" font-size="11">CURRENT BASELINE</text>
+
+    <text x="68" y="137" class="title">Runtime &amp; Data Architecture</text>
+    <text x="68" y="168" class="subtitle">Korean Chatbot Lab · law-grounded RAG · local-first execution</text>
+
+    <g transform="translate(1132 78)">
+      <line x1="0" y1="0" x2="46" y2="0" stroke="#31413a" stroke-width="2"/>
+      <text x="58" y="4" class="legend">runtime call</text>
+      <line x1="0" y1="28" x2="46" y2="28" stroke="#78867f" stroke-width="1.7" stroke-dasharray="7 7"/>
+      <text x="58" y="32" class="legend">offline / optional</text>
+      <line x1="0" y1="56" x2="46" y2="56" stroke="#0c5948" stroke-width="2.5"/>
+      <text x="58" y="60" class="legend">validated response</text>
+    </g>
+  </g>
+
+  <line x1="68" y1="192" x2="1532" y2="192" stroke="#b7beb8"/>
+
+  <g class="sans">
+    <rect x="230" y="220" width="1060" height="690" rx="22" fill="#f7f4ec" fill-opacity=".74" stroke="#647069" stroke-dasharray="8 8"/>
+    <rect x="254" y="205" width="342" height="30" rx="15" fill="#f4f1e9" stroke="#b7beb8"/>
+    <text x="275" y="225" class="boundary-label">PROJECT SYSTEM SCOPE</text>
+
+    <text x="270" y="263" class="boundary-label">ONLINE REQUEST PATH</text>
+    <line x1="438" y1="258" x2="1250" y2="258" stroke="#c9cec8"/>
+
+    <g filter="url(#soft-shadow)">
+      <rect x="52" y="325" width="145" height="180" rx="18" class="card-strong"/>
+    </g>
+    <circle cx="124" cy="370" r="22" fill="#e1e9e2" stroke="#0c5948" stroke-width="1.5"/>
+    <circle cx="124" cy="365" r="7" fill="#0c5948"/>
+    <path d="M105 391 Q124 374 143 391" fill="none" stroke="#0c5948" stroke-width="2"/>
+    <text x="76" y="426" class="type">ACTOR</text>
+    <text x="76" y="451" class="card-title" font-size="20">
+      <tspan x="76" y="451">Browser</tspan>
+      <tspan x="76" y="475">user</tspan>
+    </text>
+    <text x="76" y="497" class="small-copy" font-size="11">asks a law question</text>
+
+    <g filter="url(#soft-shadow)">
+      <rect x="270" y="290" width="220" height="245" rx="18" class="card"/>
+    </g>
+    <text x="294" y="322" class="type">WEB APPLICATION</text>
+    <text x="294" y="357" class="card-title">Next.js 16</text>
+    <text x="294" y="382" class="card-copy">streaming chat UI</text>
+    <rect x="294" y="408" width="172" height="48" rx="10" fill="#f0eee7" stroke="#c9cec8"/>
+    <text x="310" y="428" class="small-copy">SERVER ROUTE</text>
+    <text x="310" y="446" class="mono pill-text">POST /api/chat</text>
+    <rect x="294" y="476" width="106" height="28" rx="14" fill="#e8eee9"/>
+    <text x="310" y="495" class="pill-text">text stream</text>
+
+    <g filter="url(#soft-shadow)">
+      <rect x="535" y="290" width="220" height="245" rx="18" class="card"/>
+    </g>
+    <text x="559" y="322" class="type">API APPLICATION</text>
+    <text x="559" y="357" class="card-title">FastAPI</text>
+    <text x="559" y="382" class="card-copy">request validation</text>
+    <rect x="559" y="408" width="172" height="32" rx="8" fill="#f0eee7" stroke="#c9cec8"/>
+    <text x="575" y="429" class="mono pill-text">POST /ask-rag</text>
+    <rect x="559" y="452" width="172" height="32" rx="8" fill="#e8eee9" stroke="#aeb8b1"/>
+    <text x="575" y="473" class="mono pill-text">POST /ask-rag/stream</text>
+    <text x="559" y="510" class="small-copy">Pydantic request / response</text>
+
+    <g filter="url(#soft-shadow)">
+      <rect x="800" y="272" width="440" height="285" rx="20" class="card-accent"/>
+    </g>
+    <text x="824" y="305" class="type">WORKFLOW COMPONENT</text>
+    <text x="824" y="340" class="card-title">LangGraph RAG</text>
+    <rect x="1031" y="314" width="185" height="28" rx="14" fill="#0c5948"/>
+    <text x="1051" y="333" fill="#f4f1e9" class="mono" font-size="10" font-weight="800">DETERMINISTIC · 2 NODES</text>
+
+    <rect x="824" y="370" width="172" height="126" rx="14" fill="#fbfaf5" stroke="#91a198"/>
+    <text x="842" y="395" class="step-index">01 · RETRIEVE</text>
+    <text x="842" y="424" class="step-title" font-size="15">Find law articles</text>
+    <text x="842" y="449" class="small-copy">KURE-v1 embedding</text>
+    <text x="842" y="471" class="small-copy">top-5 · article dedupe</text>
+
+    <line x1="1008" y1="433" x2="1032" y2="433" class="runtime-line"/>
+
+    <rect x="1044" y="370" width="172" height="126" rx="14" fill="#fbfaf5" stroke="#91a198"/>
+    <text x="1062" y="395" class="step-index">02 · GENERATE</text>
+    <text x="1062" y="424" class="step-title" font-size="15">Grounded answer</text>
+    <text x="1062" y="449" class="small-copy">LCEL · source IDs</text>
+    <text x="1062" y="471" class="small-copy">Pydantic validation</text>
+
+    <g filter="url(#soft-shadow)">
+      <rect x="918" y="585" width="238" height="88" rx="16" class="card"/>
+    </g>
+    <text x="940" y="611" class="type">VECTOR DATA STORE</text>
+    <text x="940" y="640" class="card-title" font-size="21">Chroma index</text>
+    <text x="940" y="660" class="small-copy">260 articles · 322 chunks</text>
+
+    <g filter="url(#soft-shadow)">
+      <rect x="1325" y="305" width="225" height="200" rx="18" class="card-strong"/>
+    </g>
+    <text x="1349" y="338" class="type">LOCAL MODEL SERVER</text>
+    <text x="1349" y="373" class="card-title">Ollama</text>
+    <text x="1349" y="399" class="card-copy">Qwen3 4B Instruct</text>
+    <rect x="1349" y="425" width="177" height="34" rx="9" fill="#18211d"/>
+    <text x="1365" y="447" fill="#f4f1e9" class="mono" font-size="11" font-weight="700">/api/chat · schema</text>
+    <text x="1349" y="482" class="small-copy">temperature 0 · local runtime</text>
+
+    <rect x="1325" y="565" width="225" height="112" rx="16" fill="#f7f4ec" stroke="#9aa69f" stroke-dasharray="7 6"/>
+    <text x="1349" y="592" class="type">OPTIONAL TRACING</text>
+    <text x="1349" y="619" class="card-title" font-size="18">LangSmith</text>
+    <text x="1349" y="642" class="card-title" font-size="18">LangFeather</text>
+    <text x="1349" y="663" class="small-copy">evaluation · local traces</text>
+
+    <path d="M197 415 H270" class="runtime-line"/>
+    <rect x="204" y="390" width="62" height="19" rx="9" fill="#f4f1e9"/>
+    <text x="212" y="403" class="edge-label">question</text>
+
+    <path d="M490 415 H535" class="runtime-line"/>
+    <path d="M755 415 H800" class="runtime-line"/>
+    <path d="M1240 415 H1325" class="runtime-line"/>
+    <rect x="1250" y="390" width="66" height="19" rx="9" fill="#f4f1e9"/>
+    <text x="1258" y="403" class="edge-label">HTTP JSON</text>
+
+    <path d="M910 496 V545 Q910 560 925 560 H1018 V585" class="runtime-line"/>
+    <text x="827" y="548" class="edge-label">query / top-5 articles</text>
+
+    <path d="M1190 496 V704 H124 V505" class="response-line"/>
+    <rect x="465" y="686" width="224" height="24" rx="12" fill="#e1e9e2"/>
+    <text x="481" y="702" fill="#0c5948" class="edge-label">answer · sources · stream</text>
+
+    <path d="M1240 520 H1290 Q1305 520 1305 535 V621 H1325" class="secondary-line"/>
+    <text x="1250" y="548" class="edge-label">trace</text>
+
+    <rect x="255" y="750" width="1010" height="130" rx="18" fill="#efede6" stroke="#aeb8b1"/>
+    <text x="279" y="779" class="boundary-label">OFFLINE INDEX BUILD · REPRODUCIBLE LOCAL ARTIFACT</text>
+
+    <rect x="279" y="800" width="190" height="55" rx="12" fill="#fbfaf5" stroke="#b7beb8"/>
+    <text x="297" y="823" class="type">SOURCE SNAPSHOTS</text>
+    <text x="297" y="844" class="small-copy">4 law XML files</text>
+
+    <rect x="535" y="800" width="270" height="55" rx="12" fill="#fbfaf5" stroke="#b7beb8"/>
+    <text x="553" y="823" class="type">INDEX BUILDER</text>
+    <text x="553" y="844" class="small-copy">parse · chunk · KURE-v1 embed</text>
+
+    <path d="M469 828 H535" class="secondary-line"/>
+    <path d="M805 828 H1037 V673" class="secondary-line"/>
+    <text x="833" y="816" class="edge-label">upsert document vectors</text>
+
+    <rect x="68" y="926" width="1464" height="28" rx="14" fill="#e1e9e2"/>
+    <circle cx="88" cy="940" r="4" fill="#0c5948"/>
+    <text x="104" y="944" class="mono" fill="#31413a" font-size="11" font-weight="700">
+      CURRENT VIEW ONLY · Finlife product tools, routing, and the agent loop remain roadmap work
+    </text>
+  </g>
+</svg>
