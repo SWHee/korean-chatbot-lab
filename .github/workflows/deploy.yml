@@ -18,14 +18,24 @@ jobs:
         with:
           version: "0.11.15"
           python-version: "3.13"
-      - run: uv sync --locked
+      - run: uv sync --locked --group evaluation
       - run: uv run pytest
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
 
   build-and-deploy:
     needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
@@ -37,8 +47,31 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          platforms: linux/amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot-api:latest
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot-web:latest
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Copy Compose config to EC2
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: docker-compose.yml
+          target: ~/korean-chatbot
+          overwrite: true
 
       - name: Pull and restart on EC2
         uses: appleboy/ssh-action@v1.2.5
@@ -48,5 +81,5 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/korean-chatbot
-            docker compose pull api
-            docker compose up -d
+            docker compose pull api web ollama
+            docker compose up -d --remove-orphans
