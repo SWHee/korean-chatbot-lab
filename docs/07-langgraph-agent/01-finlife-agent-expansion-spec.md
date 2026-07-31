@@ -19,6 +19,8 @@
   [`RAG 평가에서 Agent 평가로 넘어가기 전에 정리한 판단`](../03-langsmith-evaluation/12-agent-evaluation-research.md)
 - 현재 법령 Graph와 LCEL의 역할:
   [`LangGraph로 마이그레이션한다는 의미`](../04-langgraph-migration/03-what-langgraph-migration-means.md)
+- Agent 확장 전 생성 모델 전환 결정:
+  [`Agent 확장 전 생성 모델 backend 전환 계획`](02-generation-model-backend-transition.md)
 
 완료된 과거 계획과 이 문서의 미래 순서가 다르면 이 문서를 따른다.
 
@@ -286,7 +288,7 @@ limit
 - 목표: 자연어 질문을 route와 조회 입력으로 변환
 - 출력: `route`, `law_question`, `product_filters`, `missing_fields`,
   `clarifying_question`
-- 방식: Ollama Structured Output과 Python 값 검증
+- 방식: 선택한 API 모델의 Structured Output과 Python 값 검증
 - 검증: 법령·상품·혼합·조건 부족·범위 밖 대표 사례
 - 구분: 검색 후 근거 부족은 `clarify`가 아니라 `insufficient_evidence`
 - 판단: 분류 정확성과 추가 latency를 함께 기록
@@ -318,15 +320,15 @@ limit
 - 유지: `/ask-rag`, `/ask-rag/stream`
 - 제외: thread, Next.js 연결, Agent 스트리밍
 
-### 11. Qwen Tool call 단독 확인
+### 11. 선택한 모델의 Tool call 단독 확인
 
 - 목표: Graph 밖에서 Tool 이름과 JSON 인자 생성 확인
-- 방식: 같은 로컬 Ollama와 Qwen을 `ChatOllama.bind_tools()`로 연결
+- 방식: 현재 기본 API backend의 LangChain ChatModel에 `bind_tools()` 적용
 - 순서: 법령 Tool 하나로 시작한 뒤 두 Tool 제공
 - 검증: `AIMessage.tool_calls`의 이름·인자와 Tool 불필요 질문
 - 제외: Agent loop와 FastAPI
 
-이 단계에서만 `langchain-ollama` 의존성 추가 여부를 결정한다.
+Ollama Tool Calling은 오픈웨이트 LoRA·vLLM 실습 결과를 다시 연결할 때 별도 비교한다.
 
 ### 12. 두 Tool의 단일 요청 Agent loop
 
