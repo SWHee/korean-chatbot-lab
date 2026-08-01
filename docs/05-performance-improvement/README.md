@@ -16,6 +16,7 @@
 | --- | --- | --- |
 | [`01-rag-latency`](01-rag-latency/) | 측정 설계 | 토큰 상한을 아직 변경하지 않음 |
 | [`02-rag-response-reliability`](02-rag-response-reliability/) | Structured Output v2 구현 | 간결화 Prompt 후보는 미채택 |
+| [`03-early-fallback-streaming`](03-early-fallback-streaming/) | 구현·단위 검증 | `can_answer=false` 즉시 고정 안내로 전환 |
 
 설계 중에는 관찰·선택·적용 계획까지만 기록한다. 결과 문서는 구현과 비교 평가가
 끝난 뒤에 추가한다.
