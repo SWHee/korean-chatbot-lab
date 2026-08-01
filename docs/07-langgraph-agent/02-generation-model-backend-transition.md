@@ -1,7 +1,7 @@
 # Agent 확장 전 생성 모델 backend 전환 계획
 
 - 작성일: 2026-08-01
-- 상태: 설계 완료, Anthropic API 연결 전
+- 상태: Anthropic RAG 연결 완료, UI 수동 확인·24문항 비교 전
 - 범위: 법령 RAG 생성과 이후 LangGraph Agent model
 
 ## 전환을 결정한 이유
@@ -77,6 +77,14 @@ Tool-calling Agent 단계에서는 같은 공급자 설정으로 LangChain ChatM
 6. HF 생성기와 `hf` backend 선택지 제거
 7. Product Node POC 재개
 8. Anthropic 검증 후 OpenAI 구현을 같은 계약으로 추가
+
+현재 1·2·5단계와 LangGraph custom stream 대표 질문 1건을 확인했다. UI 수동 확인과
+24문항 비교 뒤 HF 생성 경로 제거 여부를 최종 확인하고 Product Node로 돌아간다.
+
+평가 스크립트도 서버와 같은 `CHATBOT_BACKEND` 설정을 사용한다. LangSmith experiment
+metadata에는 실제 생성 backend와 모델명을 남겨, 기존 Ollama 결과와 Claude 결과를
+구분한다. 새 실행 이름도 `generation-comparison`으로 분리해 과거 baseline을 덮어쓰지
+않는다. Gemini judge와 검색 평가는 비교 조건을 유지하기 위해 그대로 둔다.
 
 기존 24문항은 Agent 전체 평가 데이터로 사용하지 않는다. 다만 corpus, KURE-v1,
 Chroma, 검색 설정과 prompt를 고정하고 생성 모델 하나만 비교하는 회귀 평가에는 계속

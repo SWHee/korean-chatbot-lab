@@ -9,7 +9,7 @@
 <h1 align="center">금융안심 · Korean Chatbot Lab</h1>
 
 <p align="center">
-  한국 금융 법령에서 근거 조문을 찾고, 로컬 LLM으로 쉽게 설명하는 RAG 챗봇
+  한국 금융 법령에서 근거 조문을 찾고, 생성 모델로 쉽게 설명하는 RAG 챗봇
 </p>
 
 <p align="center">
@@ -27,6 +27,9 @@
   </a>
   <a href="https://ollama.com/">
     <img alt="Ollama Qwen3" src="https://img.shields.io/badge/Ollama-Qwen3_4B-111111?style=flat-square&logo=ollama&logoColor=white">
+  </a>
+  <a href="https://www.anthropic.com/api">
+    <img alt="Claude Haiku" src="https://img.shields.io/badge/Claude-Haiku-D97757?style=flat-square&logo=anthropic&logoColor=white">
   </a>
   <a href="https://nextjs.org/">
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white">
@@ -68,7 +71,7 @@ LangGraph 전환 전후에는 같은 24문항 Dataset으로 검색 결과가 유
 
 - **근거 중심 답변** — 검색된 법령 조문만 사용하고, 직접 근거가 부족하면 추측
   대신 안내 범위를 명확히 표시합니다.
-- **구조화된 생성** — Ollama JSON Schema와 Pydantic 검증으로 답변 가능 여부,
+- **구조화된 생성** — Claude Structured Output과 Pydantic 검증으로 답변 가능 여부,
   본문, 근거 ID를 일관된 형식으로 처리합니다.
 - **조문 단위 검색** — KURE-v1 임베딩과 Chroma를 사용하며, 긴 조문만 나누고
   검색 결과는 다시 조문 단위로 중복 제거합니다.
@@ -114,9 +117,10 @@ client**입니다. 배포 트랙에서는 Next.js 이미지를 포함한 전체 
 현재 순서가 고정된 2노드 Workflow이며 미래 Finlife Tool과 Agent loop는 섞지
 않았습니다.
 
-프로젝트가 소유하는 생성기 경계가 Ollama와 Hugging Face 구현을 감쌉니다. 현재
-법령 RAG v2는 Ollama의 native JSON Schema를 사용하며, Hugging Face backend는
-기존 직접 추론 흐름을 확인하기 위한 선택적 구현으로 남아 있습니다.
+프로젝트가 소유하는 생성기 경계가 Anthropic과 Ollama 구현을 감쌉니다. 현재 법령
+RAG의 기본 backend는 Claude Haiku이며, Ollama Qwen3는 로컬 비교와 오픈웨이트
+실습을 위해 선택할 수 있습니다. 아래 설계도의 Ollama는 아직 API 전환 전인 Compose
+배포 기준선을 나타냅니다.
 
 ### 데이터 범위
 
@@ -130,14 +134,22 @@ client**입니다. 배포 트랙에서는 Next.js 이미지를 포함한 전체 
 
 - Python 3.13
 - [uv](https://docs.astral.sh/uv/)
-- [Ollama](https://ollama.com/)
+- Anthropic API key
+- [Ollama](https://ollama.com/): 로컬 Qwen backend를 사용할 때만 필요
 - Node.js 20.9 이상과 npm
 
 ### 1. backend와 모델 준비
 
 ```bash
 uv sync --locked
-ollama pull qwen3:4b-instruct-2507-q4_K_M
+```
+
+루트 `.env`에 Anthropic 설정을 추가합니다.
+
+```dotenv
+CHATBOT_BACKEND=anthropic
+ANTHROPIC_API_KEY=<your-anthropic-api-key>
+ANTHROPIC_MODEL=claude-haiku-4-5-20251001
 ```
 
 검색용 Chroma 인덱스는 Git에 포함하지 않으므로 최초 한 번 생성합니다.
@@ -216,7 +228,8 @@ curl -N -X POST http://127.0.0.1:8000/ask-rag/stream \
 
 ## 설정
 
-기본 생성 backend는 Ollama이며 `OLLAMA_BASE_URL`의 기본값은
+기본 생성 backend는 Anthropic입니다. Ollama를 사용할 때는
+`CHATBOT_BACKEND=ollama`로 바꾸며 `OLLAMA_BASE_URL`의 기본값은
 `http://localhost:11434`입니다. 로컬 `.env`에서 LangSmith와 선택적 LangFeather
 추적을 설정할 수 있습니다. LangFeather를 사용할 때만
 `uv sync --group tracing`으로 선택 의존성을 준비합니다.
