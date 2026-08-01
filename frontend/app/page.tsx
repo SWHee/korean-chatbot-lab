@@ -125,7 +125,10 @@ export default function Home() {
           <span className="headlineLine">조문부터 차분하게.</span>
         </h1>
         <p className="lede">예금자보호와 금융소비자 권리를 현재 수집된 법령 안에서 찾아 쉬운 말로 안내합니다.</p>
-        <div className="scope"><span>예금자보호법</span><span>금융소비자보호법</span></div>
+        <div className="scope">
+          <span>예금자보호법</span>
+          <span>금융소비자 보호에 관한 법률</span>
+        </div>
       </section>
 
       <section className="chat" aria-label="법령 상담">
