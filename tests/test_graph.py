@@ -1,5 +1,7 @@
 """법령 RAG StateGraph 실행 흐름 검증"""
 
+import pytest
+
 from chatbot import graph as graph_module
 
 
@@ -206,3 +208,162 @@ def test_fixed_route_graph_mermaid_contains_both_route_nodes() -> None:
 
     assert "law_node" in mermaid_text
     assert "product_node" in mermaid_text
+
+
+class FakeQuestionAnalysisGenerator:
+    """구조화 질문 분석 결과를 반환하는 생성기 대역"""
+
+    def __init__(self, response: dict) -> None:
+        self.response = response
+        self.requests = []
+
+    def generate_structured(self, *, messages, response_model):
+        self.requests.append(
+            {
+                "messages": messages,
+                "response_model": response_model,
+            }
+        )
+        return response_model.model_validate(self.response)
+
+
+def test_question_analysis_graph_returns_law_route() -> None:
+    """법령 질문을 law route와 법령 검색 질문으로 변환"""
+    generator = FakeQuestionAnalysisGenerator(
+        {
+            "route": "law",
+            "law_question": "예금자보호 한도는 얼마인가요?",
+            "product_filters": None,
+            "missing_fields": [],
+            "clarifying_question": None,
+        }
+    )
+
+    graph = graph_module.create_question_analysis_graph(generator)
+    result = graph.invoke({"question": "예금자보호 한도는 얼마인가요?"})
+
+    assert result["route"] == "law"
+    assert result["law_question"] == "예금자보호 한도는 얼마인가요?"
+    assert result["product_filters"] is None
+    assert generator.requests[0]["response_model"] is graph_module.QuestionAnalysis
+
+
+def test_question_analysis_graph_returns_product_route() -> None:
+    """조건이 충분한 정기예금 질문을 상품 조회 조건으로 변환"""
+    generator = FakeQuestionAnalysisGenerator(
+        {
+            "route": "product",
+            "law_question": None,
+            "product_filters": {
+                "product_type": "deposit",
+                "term_months": 12,
+                "sort_by": "base_interest_rate",
+                "limit": 3,
+            },
+            "missing_fields": [],
+            "clarifying_question": None,
+        }
+    )
+
+    graph = graph_module.create_question_analysis_graph(generator)
+    result = graph.invoke({"question": "12개월 정기예금을 비교해 주세요."})
+
+    assert result["route"] == "product"
+    assert result["product_filters"] == {
+        "product_type": "deposit",
+        "term_months": 12,
+        "sort_by": "base_interest_rate",
+        "limit": 3,
+    }
+
+
+def test_question_analysis_graph_returns_mixed_route() -> None:
+    """상품 비교와 법령 설명이 함께 있으면 mixed route 반환"""
+    generator = FakeQuestionAnalysisGenerator(
+        {
+            "route": "mixed",
+            "law_question": "예금자보호 한도를 알려주세요.",
+            "product_filters": {
+                "product_type": "deposit",
+                "term_months": 12,
+                "sort_by": "base_interest_rate",
+                "limit": 3,
+            },
+            "missing_fields": [],
+            "clarifying_question": None,
+        }
+    )
+
+    graph = graph_module.create_question_analysis_graph(generator)
+    result = graph.invoke(
+        {
+            "question": "12개월 정기예금과 예금자보호 한도를 알려주세요.",
+        }
+    )
+
+    assert result["route"] == "mixed"
+    assert result["law_question"] == "예금자보호 한도를 알려주세요."
+    assert result["product_filters"]["term_months"] == 12
+
+
+def test_question_analysis_graph_returns_clarify_route() -> None:
+    """상품 의도는 있으나 조건이 부족하면 추가 질문 반환"""
+    generator = FakeQuestionAnalysisGenerator(
+        {
+            "route": "clarify",
+            "law_question": None,
+            "product_filters": {
+                "product_type": None,
+                "term_months": None,
+                "sort_by": "base_interest_rate",
+                "limit": 3,
+            },
+            "missing_fields": ["product_type", "term_months"],
+            "clarifying_question": "예금과 적금 중 무엇을 찾으시고, 희망 기간은 몇 개월인가요?",
+        }
+    )
+
+    graph = graph_module.create_question_analysis_graph(generator)
+    result = graph.invoke({"question": "금융상품을 추천해 주세요."})
+
+    assert result["route"] == "clarify"
+    assert result["missing_fields"] == ["product_type", "term_months"]
+    assert "예금과 적금" in result["clarifying_question"]
+
+
+def test_question_analysis_graph_returns_out_of_scope_route() -> None:
+    """예·적금과 법령 범위 밖 질문을 out_of_scope로 변환"""
+    generator = FakeQuestionAnalysisGenerator(
+        {
+            "route": "out_of_scope",
+            "law_question": None,
+            "product_filters": None,
+            "missing_fields": [],
+            "clarifying_question": None,
+        }
+    )
+
+    graph = graph_module.create_question_analysis_graph(generator)
+    result = graph.invoke({"question": "오늘 서울 날씨를 알려주세요."})
+
+    assert result["route"] == "out_of_scope"
+    assert result["product_filters"] is None
+
+
+def test_question_analysis_rejects_incomplete_product_route() -> None:
+    """상품 route에는 상품 종류와 기간이 모두 필요"""
+    with pytest.raises(ValueError, match="product route requires"):
+        graph_module.QuestionAnalysis.model_validate(
+            {
+                "route": "product",
+                "law_question": None,
+                "product_filters": {
+                    "product_type": "deposit",
+                    "term_months": None,
+                    "sort_by": "base_interest_rate",
+                    "limit": 3,
+                },
+                "missing_fields": [],
+                "clarifying_question": None,
+            }
+        )

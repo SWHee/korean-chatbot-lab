@@ -3,10 +3,14 @@ from typing import Literal, NotRequired, TypedDict
 import httpx
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from chatbot.finlife import (
+    DEFAULT_PRODUCT_LIMIT,
+    DEFAULT_PRODUCT_SORT_BY,
     DepositProductOption,  # 정규화한 기간별 정기예금 금리 정보
     ProductSortBy,  # 기본금리 / 최고금리 중 비교 기준
+    ProductType,  # 정기예금·적금 상품 종류
     fetch_deposit_products,  # Finlife 정기예금 원본 응답 조회
     normalize_deposit_products,  # 원본 상품·옵션을 내부 모델로 변환
     select_deposit_products,  # 기간·금리 기준 상위 후보 선택
@@ -28,6 +32,28 @@ class RagState(TypedDict):
 
 ProductStatus = Literal["ok", "no_match", "error"]
 FixedRoute = Literal["law", "product"]
+QuestionRoute = Literal[
+    "law",
+    "product",
+    "mixed",
+    "clarify",
+    "out_of_scope",
+]
+MissingProductField = Literal["product_type", "term_months"]
+
+QUESTION_ANALYSIS_SYSTEM_PROMPT = """당신은 예·적금 금융 상담 챗봇의 질문 분류기입니다.
+사용자에게 답변하지 말고 전달된 JSON schema에 맞는 분석 결과만 반환하세요.
+
+- 법령·금융소비자보호 기준 질문은 law로 분류하고 law_question에 검색할 질문을 넣으세요.
+- 예금 또는 적금의 비교·추천 질문에서 상품 종류와 기간이 있으면 product로 분류하세요.
+- 상품 비교와 법령 질문이 함께 있으면 mixed로 분류하세요.
+- 상품을 찾으려는 의도는 있지만 상품 종류 또는 기간이 부족하면 clarify로 분류하세요.
+  이때 이미 알 수 있는 상품 조건은 product_filters에 보존하고, 빠진 필드만 missing_fields에
+  넣은 뒤 한 번에 답할 수 있는 짧은 clarifying_question을 작성하세요.
+- 예·적금 상품과 금융소비자보호 법령 범위 밖 질문은 out_of_scope로 분류하세요.
+- 법령 검색 결과가 부족할 가능성은 clarify 사유가 아닙니다.
+- sort_by는 사용자가 따로 말하지 않으면 base_interest_rate, limit은 3을 사용하세요.
+- 상품 종류는 deposit 또는 saving만 사용하세요."""
 
 
 class ProductState(TypedDict):
@@ -45,6 +71,95 @@ class FixedRouteState(TypedDict):
 
     route: FixedRoute
     executed_node: NotRequired[str]
+
+
+class ProductFilters(BaseModel):
+    """질문에서 추출한 예·적금 비교 조건"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product_type: ProductType | None = None
+    term_months: int | None = Field(default=None, ge=1)
+    sort_by: ProductSortBy = DEFAULT_PRODUCT_SORT_BY
+    limit: int = Field(default=DEFAULT_PRODUCT_LIMIT, ge=1)
+
+    def missing_required_fields(self) -> list[MissingProductField]:
+        """상품 조회 전 추가로 필요한 필드 목록"""
+        missing_fields = []
+        if self.product_type is None:
+            missing_fields.append("product_type")
+        if self.term_months is None:
+            missing_fields.append("term_months")
+        return missing_fields
+
+
+class QuestionAnalysis(BaseModel):
+    """자연어 질문을 route와 구조화 조회 조건으로 변환한 결과"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    route: QuestionRoute
+    law_question: str | None = None
+    product_filters: ProductFilters | None = None
+    missing_fields: list[MissingProductField] = Field(default_factory=list)
+    clarifying_question: str | None = None
+
+    @model_validator(mode="after")
+    def validate_route_contract(self):
+        """route별 필수·제외 필드 조합 검증"""
+        has_law_question = bool(self.law_question and self.law_question.strip())
+        product_ready = (
+            self.product_filters is not None
+            and not self.product_filters.missing_required_fields()
+        )
+
+        if self.route == "law":
+            if not has_law_question:
+                raise ValueError("law route requires law_question")
+            if self.product_filters or self.missing_fields or self.clarifying_question:
+                raise ValueError("law route must not contain product fields")
+        elif self.route == "product":
+            if not product_ready:
+                raise ValueError("product route requires complete product_filters")
+            if self.missing_fields or self.clarifying_question or self.law_question:
+                raise ValueError("product route must contain only product filters")
+        elif self.route == "mixed":
+            if not has_law_question or not product_ready:
+                raise ValueError(
+                    "mixed route requires law_question and complete product_filters"
+                )
+            if self.missing_fields or self.clarifying_question:
+                raise ValueError("mixed route must not contain clarification fields")
+        elif self.route == "clarify":
+            if not self.clarifying_question or not self.clarifying_question.strip():
+                raise ValueError("clarify route requires clarifying_question")
+            expected_fields = (
+                self.product_filters.missing_required_fields()
+                if self.product_filters is not None
+                else ["product_type", "term_months"]
+            )
+            if self.missing_fields != expected_fields:
+                raise ValueError("clarify route missing_fields must match product_filters")
+        elif (
+            has_law_question
+            or self.product_filters
+            or self.missing_fields
+            or self.clarifying_question
+        ):
+            raise ValueError("out_of_scope route must not contain analysis details")
+
+        return self
+
+
+class QuestionAnalysisState(TypedDict):
+    """질문 분석 Node의 입력과 출력 상태"""
+
+    question: str
+    route: NotRequired[QuestionRoute]
+    law_question: NotRequired[str | None]
+    product_filters: NotRequired[dict[str, object] | None]
+    missing_fields: NotRequired[list[MissingProductField]]
+    clarifying_question: NotRequired[str | None]
 
 
 def create_rag_graph(
@@ -178,5 +293,34 @@ def create_fixed_route_graph():
     )
     builder.add_edge("law_node", END)
     builder.add_edge("product_node", END)
+
+    return builder.compile()
+
+
+def create_question_analysis_graph(generator):
+    """자연어 질문을 구조화 route State로 변환하는 단일 Node 그래프"""
+
+    def analyze_question_node(state: QuestionAnalysisState) -> dict:
+        analysis = generator.generate_structured(
+            messages=[
+                {
+                    "role": "system",
+                    "content": QUESTION_ANALYSIS_SYSTEM_PROMPT,
+                },
+                {
+                    "role": "user",
+                    "content": f"질문:\n{state['question']}",
+                },
+            ],
+            response_model=QuestionAnalysis,
+        )
+        return analysis.model_dump()
+
+    builder = StateGraph(QuestionAnalysisState)
+
+    builder.add_node("analyze_question", analyze_question_node)
+
+    builder.add_edge(START, "analyze_question")
+    builder.add_edge("analyze_question", END)
 
     return builder.compile()

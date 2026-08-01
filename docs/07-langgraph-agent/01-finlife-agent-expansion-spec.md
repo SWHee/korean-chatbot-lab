@@ -290,12 +290,15 @@ limit
 
 ### 7. 구조화 질문 분석 Node
 
+- 상태: 완료 (2026-08-02)
 - 목표: 자연어 질문을 route와 조회 입력으로 변환
 - 출력: `route`, `law_question`, `product_filters`, `missing_fields`,
   `clarifying_question`
 - 방식: 선택한 API 모델의 Structured Output과 Python 값 검증
 - 검증: 법령·상품·혼합·조건 부족·범위 밖 대표 사례
 - 구분: 검색 후 근거 부족은 `clarify`가 아니라 `insufficient_evidence`
+- 결과: 다섯 route의 구조화 결과와 불완전한 product route 거부 검증 통과
+- 적용: `create_question_analysis_graph()`가 `analyze_question` Node 하나를 실행
 - 판단: 분류 정확성과 추가 latency를 함께 기록
 - 제외: 이전 턴 기억, Tool calling, 최종 답변
 
