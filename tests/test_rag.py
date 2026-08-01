@@ -48,6 +48,20 @@ class FakeGenerator:
         )
 
 
+class EarlyFalseGenerator:
+    """false 조각 이후 생성을 끝내지 않는 테스트 생성기"""
+
+    def __init__(self) -> None:
+        self.stream_closed = False
+
+    def stream_structured(self, *, messages, response_model):
+        try:
+            yield {"result": [False]}
+            raise AssertionError("false 이후 구조화 응답을 기다렸습니다.")
+        finally:
+            self.stream_closed = True
+
+
 def test_format_context_includes_source_and_text() -> None:
     """검색 조문의 출처와 본문을 모델 입력 문맥으로 변환"""
     articles = [
@@ -102,6 +116,18 @@ def test_build_rag_inputs_combines_question_and_articles() -> None:
 def test_format_context_marks_missing_evidence() -> None:
     """검색 조문이 없음을 모델 입력에 명시"""
     assert rag_module.format_context([]) == "검색된 법령 근거 없음"
+
+
+def test_insufficient_evidence_message_guides_next_question() -> None:
+    """근거 부족 안내에서 지원 범위와 다음 질문 예시 제공"""
+    assert rag_module.INSUFFICIENT_EVIDENCE_MESSAGE == (
+        "질문과 바로 연결되는 법령 근거를 찾지 못했어요.\n"
+        "법령·소비자보호 기준이 궁금한지, 예금·적금 상품을 비교하고 싶은지 "
+        "조금만 더 알려주시면 알맞게 다시 확인해 드릴게요.\n"
+        "예: ‘예금자보호 한도가 궁금해요’ 또는 ‘12개월 정기예금을 비교해 주세요’\n"
+        "상품별 금리와 가입 조건은 바뀔 수 있으니 최종 선택 전 금융회사의 "
+        "최신 상품설명서도 함께 확인해 주세요."
+    )
 
 
 def test_rag_prompt_formats_question_and_context() -> None:
@@ -314,6 +340,23 @@ def test_stream_answer_question_uses_fixed_message_when_evidence_is_insufficient
         )
     )
 
+    assert len(chunks) > 1
+    assert "".join(chunks) == rag_module.INSUFFICIENT_EVIDENCE_MESSAGE
+
+
+def test_stream_answer_question_stops_after_early_false() -> None:
+    """답변 불가 여부가 확인되면 남은 모델 스트림 조기 종료"""
+    generator = EarlyFalseGenerator()
+
+    chunks = list(
+        rag_module.stream_answer_question(
+            generator,
+            "주거 금융상품을 추천해 주세요.",
+            [],
+        )
+    )
+
+    assert generator.stream_closed is True
     assert len(chunks) > 1
     assert "".join(chunks) == rag_module.INSUFFICIENT_EVIDENCE_MESSAGE
 

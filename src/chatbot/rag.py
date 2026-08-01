@@ -12,10 +12,12 @@ from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
 
 
 INSUFFICIENT_EVIDENCE_MESSAGE = (
-    "현재 확인된 법령 근거만으로는 질문에 정확히 답변드리기 어렵습니다.\n"
-    "잘못된 안내를 피하기 위해 관련 없는 내용을 추측해서 설명하지 않겠습니다.\n"
-    "개별 상품이나 가입 조건은 해당 금융회사의 상품설명서와 관계 기관의 "
-    "최신 공식 안내를 함께 확인해 주세요."
+    "질문과 바로 연결되는 법령 근거를 찾지 못했어요.\n"
+    "법령·소비자보호 기준이 궁금한지, 예금·적금 상품을 비교하고 싶은지 "
+    "조금만 더 알려주시면 알맞게 다시 확인해 드릴게요.\n"
+    "예: ‘예금자보호 한도가 궁금해요’ 또는 ‘12개월 정기예금을 비교해 주세요’\n"
+    "상품별 금리와 가입 조건은 바뀔 수 있으니 최종 선택 전 금융회사의 "
+    "최신 상품설명서도 함께 확인해 주세요."
 )
 
 
@@ -246,6 +248,17 @@ def stream_answer_question(
             break
 
         result = partial.get("result")
+        if (
+            isinstance(result, list)
+            and result
+            and result[0] is False
+        ):
+            structured_stream.close()
+            yield from INSUFFICIENT_EVIDENCE_MESSAGE.splitlines(
+                keepends=True
+            )
+            return
+
         if (
             not isinstance(result, list)
             or len(result) < 3
