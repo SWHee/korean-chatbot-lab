@@ -1,4 +1,4 @@
-# LangFeather 로컬 추적
+# LangFeather 0.2.0 로컬 추적
 
 이 폴더는 Korean Chatbot에 LangFeather를 연결한 이유와 개인 개발 환경에서
 재현하는 방법을 설명한다.
@@ -34,6 +34,10 @@ Docker 컨테이너가 모델을 실행하는 것은 아니다. 모델과 LangGr
 
 LangFeather를 연결했다고 기존 LangSmith 평가가 대체되지는 않는다. 현재 버전은
 `retrieve → generate` 실행 경로와 각 단계의 입출력을 가볍게 확인하는 용도다.
+
+collector는 GHCR의 완성된 Docker 이미지를 로컬에서 실행하고, Python SDK는 PyPI에서
+설치한다. GitHub는 이미지를 보관할 뿐이며 collector 프로세스와 trace 데이터는
+사용자의 컴퓨터와 로컬 Docker volume에 남는다.
 
 ## 문서 순서
 

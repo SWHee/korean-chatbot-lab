@@ -76,6 +76,7 @@ def prepare_rag_resources(app: FastAPI) -> None:
             langfeather_sdk.configure(
                 endpoint=os.getenv("LANGFEATHER_ENDPOINT") or None,
             )
+            # 그래프를 LangFeather 추적 가능한 Runnable로 래핑
             rag_graph = langfeather_sdk.wrap_runnable(
                 rag_graph,
                 name=LANGFEATHER_TRACE_NAME,

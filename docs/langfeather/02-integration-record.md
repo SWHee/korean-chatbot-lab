@@ -1,5 +1,9 @@
 # LangFeather 연결 및 검증 기록
 
+> 이 문서는 2026-07-28의 최초 연결 방식과 판단을 보존한 개발 기록이다. 현재
+> LangFeather 0.2.0 설치·실행 방법은
+> [개인 실행 안내](01-local-setup.md)를 따른다.
+
 ## 적용 목적과 선택
 
 현재 프로젝트는 LangSmith의 24문항 평가와 별개로, LangGraph가 실제로 어떤 노드를
@@ -86,14 +90,14 @@ UI에서 법령 질문과 근거가 부족한 상품 질문을 실행했으며, 
 확인했다. LangFeather를 끈 일반 서버에서는 같은 요청이 기존 LangSmith에만
 기록되는 것도 확인해 두 추적 설정이 독립적으로 동작함을 검증했다.
 
-## 현재 볼 수 없는 정보
+## 당시 확인하지 못한 정보
 
 현재 `OllamaGenerator`는 LangChain의 chat model adapter가 아니라 Ollama HTTP API를
 직접 호출한다. 그래서 LangGraph의 `retrieve`와 `generate` 노드 실행은 보이지만,
 Ollama의 token 수, `done_reason`, model load 시간 같은 native 응답 지표가 자동으로
 LLM observation에 채워지지는 않는다. 이 지표는 별도의 instrumentation 개선 단위다.
 
-또한 LangFeather v1은 trace 확인과 수동 feedback 중심이다. 현재 프로젝트의
+또한 당시 검증한 버전은 trace 확인과 수동 feedback 중심이었다. 현재 프로젝트의
 Dataset 실행, evaluator 채점, 실험 간 평균 비교는 기존 LangSmith 평가 흐름에
 남겨 둔다. Agent 평가 기능을 구현할 때 두 도구의 역할을 다시 비교한다.
 

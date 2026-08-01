@@ -26,7 +26,7 @@ evaluation = [
     "langsmith>=0.9.7",
 ]
 tracing = [
-    "langfeather[langchain]",
+    "langfeather[langchain]==0.2.0",
 ]
 
 [build-system]
@@ -37,7 +37,6 @@ build-backend = "uv_build"
 module-name = "chatbot"
 
 [tool.uv.sources]
-langfeather = { git = "https://github.com/SungjinWi99/langfeather.git", subdirectory = "sdk/python", rev = "a410f7c4211bbcabb9c9e5717bc23988797f9605" }
 torch = [
     { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
 ]

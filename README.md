@@ -246,6 +246,11 @@ LANGFEATHER_ENDPOINT=http://127.0.0.1:4319
 전체 설정 예시는 [.env.example](.env.example)을 참고하세요. `.env`, 모델 weight,
 cache와 Chroma 인덱스는 저장소에 커밋하지 않습니다.
 
+LangFeather 0.2.0 collector와 SDK를 로컬에서 준비하는 순서는
+[LangFeather 개인 실행 안내](docs/langfeather/01-local-setup.md)를 참고하세요.
+LangFeather는 선택적 로컬 추적이며 기존 LangSmith 추적·평가와 별도로 사용할 수
+있습니다.
+
 ## 평가
 
 `rag-v1-dev`는 법령 질문, 일상 표현, 추가 정보 필요, 상충 표현과 범위 밖 질문을

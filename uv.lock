@@ -1204,7 +1204,7 @@ evaluation = [
     { name = "langchain-google-genai", specifier = ">=4.2.7" },
     { name = "langsmith", specifier = ">=0.9.7" },
 ]
-tracing = [{ name = "langfeather", extras = ["langchain"], git = "https://github.com/SungjinWi99/langfeather.git?subdirectory=sdk%2Fpython&rev=a410f7c4211bbcabb9c9e5717bc23988797f9605" }]
+tracing = [{ name = "langfeather", extras = ["langchain"], specifier = "==0.2.0" }]
 
 [[package]]
 name = "kubernetes"
@@ -1288,8 +1288,12 @@ wheels = [
 
 [[package]]
 name = "langfeather"
-version = "0.1.0"
-source = { git = "https://github.com/SungjinWi99/langfeather.git?subdirectory=sdk%2Fpython&rev=a410f7c4211bbcabb9c9e5717bc23988797f9605#a410f7c4211bbcabb9c9e5717bc23988797f9605" }
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/1d/f9690c5bbcc44b5a230cb7800aad5219999da793c12794568280e405f593/langfeather-0.2.0.tar.gz", hash = "sha256:aea70f49f97341b399f60f2aba0a257791e8198dd15932f13deedc72c6b96ad4", size = 44211, upload-time = "2026-07-30T12:14:43.59Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/68/3d1444875ab1d5c0b6182a5e46331af45edc4baf8f9d61cf7c757cf97a06/langfeather-0.2.0-py3-none-any.whl", hash = "sha256:a4d6eaaf7950c00ad38134a2079485558da39fb154a9a339e97257534e228da5", size = 41524, upload-time = "2026-07-30T12:14:42.455Z" },
+]
 
 [package.optional-dependencies]
 langchain = [

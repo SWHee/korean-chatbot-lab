@@ -1,144 +1,100 @@
-# LangFeather 개인 실행 안내
+# LangFeather 0.2.0 개인 실행 안내
 
-## 1. 사전 준비
+LangFeather는 이 프로젝트의 선택적 로컬 추적 도구다. collector를 EC2나 외부에
+공개하지 않고, 개인 컴퓨터에서만 실행한다.
 
-처음 한 번 다음 항목이 필요하다.
+## 1. collector와 SDK 준비
 
-- Docker Desktop 실행
-- LangFeather 저장소 clone
-- Korean Chatbot 저장소의 `uv sync --group tracing` 완료
-
-계정이나 API key는 필요하지 않다. Docker image를 처음 만들 때만 image와
-dependency를 내려받기 위한 인터넷 연결이 필요하다. Korean Chatbot의 LangFeather
-SDK는 `uv.lock`에 고정되어 있으므로 새 사용자는 별도의 `uv add`를 실행하지 않고
-다음 명령만 실행한다.
+Docker Desktop을 실행한 뒤 공개 이미지를 내려받아 collector를 시작한다. LangFeather
+저장소를 clone하거나 이미지를 직접 build하지 않는다.
 
 ```bash
-cd /path/to/korean-chatbot
+docker pull ghcr.io/sungjinwi99/langfeather:0.2.0
+
+docker run -d --name langfeather \
+  -p 127.0.0.1:4319:4319 \
+  -v langfeather-data:/data \
+  ghcr.io/sungjinwi99/langfeather:0.2.0
+```
+
+Korean Chatbot 저장소에서는 PyPI의 Python SDK를 설치한다.
+
+```bash
 uv sync --group tracing
 ```
 
-## 2. 로컬 대시보드 시작
+GitHub Container Registry는 완성된 Docker 이미지를 보관한다. collector는 사용자의
+Docker에서 실행되고 trace는 `langfeather-data`라는 로컬 Docker volume에 저장된다.
+GitHub 저장소나 외부 서버에 trace를 저장하는 구조가 아니다.
 
-LangFeather 저장소 터미널에서 실행한다.
+health와 화면을 확인한다.
 
 ```bash
-cd /path/to/langfeather
-docker compose up -d --build
+curl --fail http://127.0.0.1:4319/api/v1/health
 ```
 
-정상 여부를 확인한다.
+- 대시보드: `http://127.0.0.1:4319`
+- 계정·API key: 필요 없음
+
+## 2. 호스트에서 FastAPI와 추적 실행
+
+FastAPI를 Mac 호스트에서 실행할 때 collector 주소는 `127.0.0.1:4319`다.
 
 ```bash
-curl http://127.0.0.1:4319/api/v1/health
-```
-
-브라우저에서 `http://127.0.0.1:4319`를 연다. 이 주소의 화면과 수집 API는 같은
-Docker 컨테이너가 제공하고, 기록은 `langfeather-data` Docker volume에 저장된다.
-컨테이너를 재시작해도 volume을 지우지 않으면 기록이 남는다.
-
-## 3. 추적을 켠 챗봇 서버 실행
-
-Korean Chatbot 저장소의 새 터미널에서 다음처럼 실행한다.
-
-```bash
-cd /path/to/korean-chatbot
-
-LANGSMITH_TRACING=false \
-LANGCHAIN_TRACING_V2=false \
 LANGFEATHER_ENABLED=true \
 LANGFEATHER_ENDPOINT=http://127.0.0.1:4319 \
 uv run --group tracing fastapi dev
 ```
 
-두 LangSmith 변수를 함께 끄는 이유는 이번 확인에서 로컬 LangFeather 기록과
-LangSmith 기록을 섞지 않기 위해서다. `.env`보다 위 명령의 값이 우선한다.
+질문을 보낸 뒤 대시보드에서 `korean-chatbot-rag` trace를 선택한다. 최상위
+LangGraph 아래의 `retrieve`, `generate` 실행과 입출력을 확인할 수 있다.
 
-매번 입력하기 싫다면 개인 `.env`에 아래 두 줄을 추가해도 된다. `.env`는
-Git에 올리지 않는다.
+LangSmith를 함께 켜고 싶으면 기존 `LANGSMITH_TRACING=true` 설정을 유지한다. 두 도구는
+서로를 대체하거나 설정을 덮어쓰지 않으며, 같은 실행을 각자의 저장소에 추적할 수
+있다. LangFeather만 확인하려면 해당 실행에서 LangSmith를 별도로 끈다.
 
-```dotenv
-LANGFEATHER_ENABLED=true
-LANGFEATHER_ENDPOINT=http://127.0.0.1:4319
-```
+## 3. Docker 주소 구분
 
-## 4. 질문을 보내고 기록 확인
+`127.0.0.1`은 현재 프로세스가 실행되는 자기 컴퓨터나 컨테이너를 가리킨다.
 
-일반 응답은 다음 명령으로 확인한다.
+- FastAPI가 호스트에서 실행: `http://127.0.0.1:4319`
+- FastAPI도 Docker Desktop 컨테이너에서 실행: 컨테이너의 `127.0.0.1`은 collector가 아님
 
-```bash
-curl -X POST http://127.0.0.1:8000/ask-rag \
-  -H "Content-Type: application/json" \
-  -d '{"question":"은행이 파산하면 예금은 얼마까지 보호되나요?"}'
-```
+현재 기본 `docker-compose.yml`은 운영·EC2 배포 경계이므로 LangFeather SDK와
+collector를 포함하지 않고 `LANGFEATHER_ENABLED=false`를 유지한다. 따라서 기본
+Compose에서 임의로 tracing을 켜지 않는다.
 
-채팅 UI를 사용하려면 FastAPI를 켜 둔 채 다른 터미널에서 실행한다.
+Mac Docker Desktop에서 별도로 tracing SDK가 포함된 API 컨테이너를 준비한 경우에는
+호스트 collector에 `http://host.docker.internal:4319`로 접근할 수 있다. 이는 현재
+Mac 개발 환경용 주소이며 EC2나 일반 Linux Docker에 그대로 적용하지 않는다.
+LangFeather collector를 기본 Compose service로 추가하거나 public EC2에 공개하지
+않는다.
 
-```bash
-cd frontend
-npm run dev
-```
+## 4. 종료와 데이터
 
-질문이 끝난 뒤 LangFeather 화면을 새로고침하고
-`korean-chatbot-rag` trace를 선택한다. 현재 그래프에서는 최상위 LangGraph 아래
-`retrieve`, `generate` 실행과 각 단계의 입출력을 확인할 수 있어야 한다.
+FastAPI는 종료할 때 SDK의 대기 중인 trace 전송을 마무리한다. 계속 실행되는 서버에서
+요청마다 `flush()`를 호출하지 않는다.
 
-추적 전송은 응답 경로를 막지 않는 백그라운드 작업이다. 화면에 즉시 나타나지 않으면
-잠깐 뒤 새로고침한다. 서버를 정상 종료하면 남아 있던 기록을 최대 2초 동안 전송한
-뒤 닫는다.
-
-## 5. 평소 실행과 종료
-
-추적을 끄려면 환경 변수를 제거하거나 다음 값으로 실행한다.
-
-```dotenv
-LANGFEATHER_ENABLED=false
-```
-
-LangFeather 저장소에서 데이터는 보존하고 컨테이너만 멈춘다.
+collector만 멈추고 trace volume을 보존한다.
 
 ```bash
-docker compose stop
+docker stop langfeather
 ```
 
-`docker compose down -v`는 컨테이너와 함께 로컬 trace volume도 삭제한다. 기존
-기록이 필요하지 않은 것이 확실할 때만 사용한다.
+다시 시작할 때는 다음 명령을 사용한다.
 
-## Docker 주소를 혼동하기 쉬운 이유
+```bash
+docker start langfeather
+```
 
-현재 POC의 권장 실행은 다음 조합이다.
-
-- Korean Chatbot FastAPI: Mac 호스트에서 실행
-- LangFeather 대시보드: Docker에서 실행
-- 연결 주소: `http://127.0.0.1:4319`
-
-`127.0.0.1`은 각 프로세스가 실행되는 자기 공간을 뜻한다. 따라서 나중에 Korean
-Chatbot FastAPI도 Docker 안에서 실행하면 그 컨테이너의 `127.0.0.1`은
-LangFeather 컨테이너가 아니다. 그 단계에서는 두 서비스를 같은 Docker Compose
-network에 넣고 `http://langfeather:4319`처럼 서비스 이름으로 연결해야 한다.
-현재 프로젝트 Compose에는 아직 LangFeather 서비스를 합치지 않았다.
+`docker rm`이나 volume 삭제는 기존 trace가 필요하지 않은 경우에만 별도로 수행한다.
 
 ## 자주 확인할 문제
 
 | 증상 | 확인할 내용 |
 | --- | --- |
-| `4319` 접속 실패 | Docker Desktop과 LangFeather 컨테이너 실행 여부 |
+| `4319` 접속 실패 | Docker Desktop과 `langfeather` 컨테이너 실행 여부 |
 | 챗봇은 답하지만 trace가 없음 | `LANGFEATHER_ENABLED=true`로 FastAPI를 다시 시작했는지 |
-| 예전 trace만 보임 | 질문 완료 후 화면 새로고침, endpoint가 `127.0.0.1:4319`인지 |
-| LangSmith에도 trace가 생김 | 두 LangSmith tracing 변수를 `false`로 실행했는지 |
-| Docker 안의 API에서 연결 실패 | `127.0.0.1` 대신 같은 network의 서비스 주소 필요 |
-
-## LangFeather SDK를 업데이트한 경우
-
-이 프로젝트는 항상 최신 `main`을 자동으로 가져오지 않고 검증한 LangFeather commit을
-고정한다. 일반 사용자는 이 작업이 필요 없다. LangFeather SDK를 수정한 개발자가
-새 버전을 이 프로젝트에서 검증할 때만 `<commit-sha>`를 실제 commit으로 바꿔
-실행한다.
-
-```bash
-uv add \
-  "langfeather[langchain] @ git+https://github.com/SungjinWi99/langfeather.git@<commit-sha>#subdirectory=sdk/python"
-```
-
-이 명령은 `pyproject.toml`과 `uv.lock`을 함께 갱신한다. 변경된 SDK와 이 프로젝트의
-전체 테스트를 통과시킨 뒤 두 파일을 같은 변경 단위로 남긴다.
+| 호스트 API에서 연결 실패 | endpoint가 `http://127.0.0.1:4319`인지 |
+| Docker API에서 연결 실패 | 컨테이너 안의 `127.0.0.1`을 사용하지 않았는지 |
+| LangSmith에도 trace가 생김 | 두 추적 도구를 함께 활성화한 정상 결과인지 |
