@@ -270,10 +270,13 @@ limit
 
 ### 5. Product Node POC
 
+- 상태: 완료 (2026-08-02)
 - 목표: 검증된 상품 조건으로 `products`와 `product_status`를 State에 추가
 - 그래프: `START → search_products → END`
 - 입력: 자연어가 아닌 구조화 상품 조건
 - 검증: 상품 후보, 결과 없음, 예상 가능한 API 오류
+- 결과: 정기예금 후보 `ok`, 빈 후보 `no_match`, Finlife 오류 `error` 상태 검증 통과
+- 적용: 기존 `graph.py`에 별도 `ProductState`와 `create_product_graph()` 추가
 - 제외: 질문 분류, 법령 경로, 답변 생성
 
 ### 6. 고정 route 조건부 Edge
