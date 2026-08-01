@@ -179,3 +179,30 @@ def test_product_graph_marks_expected_api_error(monkeypatch) -> None:
 
     assert result["products"] == []
     assert result["product_status"] == "error"
+
+
+def test_fixed_route_graph_runs_only_selected_node() -> None:
+    """route 값에 따라 법령 또는 상품 Node 한 곳만 실행"""
+    graph = graph_module.create_fixed_route_graph()
+
+    law_result = graph.invoke({"route": "law"})
+    product_result = graph.invoke({"route": "product"})
+
+    assert law_result == {
+        "route": "law",
+        "executed_node": "law_node",
+    }
+    assert product_result == {
+        "route": "product",
+        "executed_node": "product_node",
+    }
+
+
+def test_fixed_route_graph_mermaid_contains_both_route_nodes() -> None:
+    """조건부 Edge의 law·product Node 노출"""
+    graph = graph_module.create_fixed_route_graph()
+
+    mermaid_text = graph.get_graph().draw_mermaid()
+
+    assert "law_node" in mermaid_text
+    assert "product_node" in mermaid_text

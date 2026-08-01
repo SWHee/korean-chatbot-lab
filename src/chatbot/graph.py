@@ -27,6 +27,7 @@ class RagState(TypedDict):
 
 
 ProductStatus = Literal["ok", "no_match", "error"]
+FixedRoute = Literal["law", "product"]
 
 
 class ProductState(TypedDict):
@@ -37,6 +38,13 @@ class ProductState(TypedDict):
     limit: int
     products: NotRequired[list[DepositProductOption]]
     product_status: NotRequired[ProductStatus]
+
+
+class FixedRouteState(TypedDict):
+    """고정 route 조건부 Edge 확인용 상태"""
+
+    route: FixedRoute
+    executed_node: NotRequired[str]
 
 
 def create_rag_graph(
@@ -140,5 +148,35 @@ def create_product_graph():
 
     builder.add_edge(START, "search_products")
     builder.add_edge("search_products", END)
+
+    return builder.compile()
+
+
+def create_fixed_route_graph():
+    """State route에 따라 한 개 Node를 선택하는 조건부 Edge 그래프"""
+
+    def select_route(state: FixedRouteState) -> FixedRoute:
+        return state["route"]
+
+    def law_node(state: FixedRouteState) -> dict:
+        return {"executed_node": "law_node"}
+
+    def product_node(state: FixedRouteState) -> dict:
+        return {"executed_node": "product_node"}
+
+    builder = StateGraph(FixedRouteState)
+
+    builder.add_node("law_node", law_node)
+    builder.add_node("product_node", product_node)
+    builder.add_conditional_edges(
+        START,
+        select_route,
+        {
+            "law": "law_node",
+            "product": "product_node",
+        },
+    )
+    builder.add_edge("law_node", END)
+    builder.add_edge("product_node", END)
 
     return builder.compile()

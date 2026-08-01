@@ -281,9 +281,11 @@ limit
 
 ### 6. 고정 route 조건부 Edge
 
+- 상태: 완료 (2026-08-02)
 - 목표: State에 직접 넣은 `law` 또는 `product` 경로 선택
 - 검증: 각 route가 지정 Node 한 곳만 실행
 - 확인: Mermaid 문자열로 Graph 모양 확인
+- 결과: `add_conditional_edges()`로 law·product Node 한 곳만 선택하는 POC 통과
 - 제외: LLM Router, 혼합 경로, Agent
 
 ### 7. 구조화 질문 분석 Node
