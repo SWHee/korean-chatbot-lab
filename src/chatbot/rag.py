@@ -1,7 +1,6 @@
 """법령 검색과 생성 모델을 연결하는 RAG 체인"""
 
 from collections.abc import Iterator
-from typing import Annotated
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
@@ -29,39 +28,13 @@ class RagAnswer(BaseModel):
     can_answer: bool = Field(
         description="제공된 법령 근거로 질문에 직접 답할 수 있는지 여부"
     )
-    answer: str = Field(
-        description="답할 수 있을 때 고객에게 보여줄 쉬운 한국어 존댓말 설명"
-    )
     source_ids: list[str] = Field(
         default_factory=list,
         max_length=DEFAULT_TOP_K,
         description="답변을 직접 뒷받침하는 법령 근거 ID",
     )
-
-
-class RagStreamEnvelope(BaseModel):
-    """근거를 답변보다 먼저 확정하는 스트리밍 전용 형식"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    result: tuple[
-        Annotated[
-            bool,
-            Field(description="법령 근거로 직접 답할 수 있는지"),
-        ],
-        Annotated[
-            list[str],
-            Field(
-                max_length=DEFAULT_TOP_K,
-                description="직접 근거가 되는 S번호 목록",
-            ),
-        ],
-        Annotated[
-            str,
-            Field(description="고객에게 보여줄 한국어 존댓말 답변"),
-        ],
-    ] = Field(
-        description="can_answer, source_ids, answer 순서의 결과",
+    answer: str = Field(
+        description="답할 수 있을 때 고객에게 보여줄 쉬운 한국어 존댓말 설명"
     )
 
 
@@ -69,17 +42,22 @@ RAG_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "당신은 예·적금 금융 상담 챗봇에서 법령 근거를 설명하는 담당자입니다.\n"
+            "당신은 예·적금 금융 상담 챗봇의 법령 안내 담당자입니다. "
+            "사용자가 안심하고 이해할 수 있도록 정확하고 친절하게 설명하세요.\n"
             "- 제공된 법령 근거만 사용하세요.\n"
             "- 질문에 직접 답하는 근거가 있으면 can_answer를 true로 하고, "
-            "결론을 먼저 말한 뒤 필요한 이유와 조건을 친절한 한국어 존댓말로 "
-            "설명하세요. 같은 내용은 반복하지 마세요.\n"
+            "결론을 먼저 말한 뒤 이유와 중요한 조건을 차분하고 친절한 한국어 "
+            "존댓말로 설명하세요. 법률 용어는 일상적인 표현으로 쉽게 풀어 쓰고 "
+            "같은 내용은 반복하지 마세요.\n"
+            "- 사용자가 다음에 확인할 사항이 있을 때만 마지막에 한 문장으로 "
+            "안내하세요.\n"
             "- 직접 답하는 근거가 없으면 can_answer를 false로 하고 answer와 "
             "source_ids를 비우세요.\n"
             "- source_ids에는 답변을 직접 뒷받침하는 제공된 [S번호]만 넣으세요.\n"
+            "- 법령명·조문번호·시행일은 화면의 근거 목록에서 별도로 표시되므로 "
+            "answer에 반복해 나열하지 마세요.\n"
             "- 근거에 없는 내용을 추측하거나 개별 상품의 보호 여부를 단정하지 "
-            "마세요.\n"
-            "- 전달된 JSON schema에 맞는 JSON만 반환하세요.",
+            "마세요.",
         ),
         # 사용자 질문과 검색 조문을 함께 전달
         ("human", "질문:\n{question}\n\n법령 근거:\n{context}"),
@@ -218,20 +196,8 @@ def stream_answer_question(
         )
     )
     structured_stream = generator.stream_structured(
-        messages=[
-            {
-                **message,
-                "content": (
-                    message["content"]
-                    + "\n- 스트리밍 응답의 result 배열은 반드시 "
-                    "[can_answer, source_ids, answer] 순서로 채우세요."
-                    if message["role"] == "system"
-                    else message["content"]
-                ),
-            }
-            for message in prompt_to_chat_messages(prompt_value)
-        ],
-        response_model=RagStreamEnvelope,
+        messages=prompt_to_chat_messages(prompt_value),
+        response_model=RagAnswer,
     )
     streamed_answer = ""
 
@@ -239,20 +205,10 @@ def stream_answer_question(
         try:
             partial = next(structured_stream)
         except StopIteration as completed:  # 반복이 끝났음을 알리는 예외처리 StopIteration
-            can_answer, source_ids, answer = completed.value.result
-            structured_answer = RagAnswer(
-                can_answer=can_answer,
-                source_ids=source_ids,
-                answer=answer,
-            )
+            structured_answer = completed.value
             break
 
-        result = partial.get("result")
-        if (
-            isinstance(result, list)
-            and result
-            and result[0] is False
-        ):
+        if partial.get("can_answer") is False:
             structured_stream.close()
             yield from INSUFFICIENT_EVIDENCE_MESSAGE.splitlines(
                 keepends=True
@@ -260,20 +216,18 @@ def stream_answer_question(
             return
 
         if (
-            not isinstance(result, list)
-            or len(result) < 3
-            or result[0] is not True
-            or not isinstance(result[1], list)
-            or not isinstance(result[2], str)
+            partial.get("can_answer") is not True
+            or not isinstance(partial.get("source_ids"), list)
+            or not isinstance(partial.get("answer"), str)
         ):
             continue
 
-        visible_answer = result[2].strip()
+        visible_answer = partial["answer"].strip()
         try:
             validate_rag_answer(
                 RagAnswer(
                     can_answer=True,
-                    source_ids=result[1],
+                    source_ids=partial["source_ids"],
                     answer=visible_answer,
                 ),
                 articles,

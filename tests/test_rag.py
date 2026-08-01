@@ -21,7 +21,7 @@ class FakeGenerator:
 
     def stream_structured(self, *, messages, response_model):
         self.messages.append(messages)
-        assert response_model is rag_module.RagStreamEnvelope
+        assert response_model is rag_module.RagAnswer
         if self.response.can_answer:
             midpoint = max(1, len(self.response.answer) // 2)
             for answer in (
@@ -29,23 +29,17 @@ class FakeGenerator:
                 self.response.answer,
             ):
                 yield {
-                    "result": [
-                        True,
-                        self.response.source_ids,
-                        answer,
-                    ]
+                    "can_answer": True,
+                    "source_ids": self.response.source_ids,
+                    "answer": answer,
                 }
         else:
             yield {
-                "result": [False, [], ""],
+                "can_answer": False,
+                "source_ids": [],
+                "answer": "",
             }
-        return rag_module.RagStreamEnvelope(
-            result=(
-                self.response.can_answer,
-                self.response.source_ids,
-                self.response.answer,
-            )
-        )
+        return self.response
 
 
 class EarlyFalseGenerator:
@@ -56,7 +50,7 @@ class EarlyFalseGenerator:
 
     def stream_structured(self, *, messages, response_model):
         try:
-            yield {"result": [False]}
+            yield {"can_answer": False}
             raise AssertionError("false 이후 구조화 응답을 기다렸습니다.")
         finally:
             self.stream_closed = True
@@ -143,11 +137,14 @@ def test_rag_prompt_formats_question_and_context() -> None:
 
     assert "제공된 법령 근거만 사용" in system_message
     assert "can_answer" in system_message
-    assert "친절한 한국어 존댓말" in system_message
+    assert "차분하고 친절한 한국어 존댓말" in system_message
+    assert "법률 용어는 일상적인 표현" in system_message
+    assert "사용자가 다음에 확인할 사항" in system_message
     assert "같은 내용은 반복하지 마세요" in system_message
     assert "제공된 [S번호]만" in system_message
     assert "근거에 없는 내용을 추측" in system_message
     assert "개별 상품의 보호 여부" in system_message
+    assert "JSON schema" not in system_message
     assert messages[1].content == (
         "질문:\n예금은 얼마까지 보호되나요?\n\n"
         "법령 근거:\n출처: 예금자보호법 시행령 제18조\n보험금 한도는 1억원"
