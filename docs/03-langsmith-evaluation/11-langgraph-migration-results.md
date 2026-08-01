@@ -78,5 +78,5 @@ Judge 판정은 실행할 때마다 달라질 수 있고, A1에서는 Judge가 �
 평가 답변을 살펴보면서 같은 결론을 반복하는 문제도 발견했습니다. 다음에는 그래프
 구조와 검색 설정을 그대로 두고 간결화 Prompt 후보를 비교했습니다. 이 후보는
 응답이 짧고 빨라졌지만 품질이 낮아 미채택했으며, 후속 방향은
-[RAG Structured Output v2 설계](../05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md)에
+[RAG Structured Output v2 설계](../00-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md)에
 기록했습니다.

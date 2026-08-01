@@ -326,7 +326,7 @@ korean-chatbot/
 | [RAG 파이프라인 개요](docs/02-langchain-rag/03-guides/01-rag-pipeline-overview.md) | 수집부터 검색·답변까지의 코드 흐름 |
 | [RAG 평가 Dataset](data/evaluation/README.md) | 24문항 구성과 지표 계약 |
 | [LangGraph 전환 결과](docs/03-langsmith-evaluation/11-langgraph-migration-results.md) | 전환 전후 회귀평가 |
-| [Structured Output v2](docs/05-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md) | schema와 근거 ID 검증 |
+| [Structured Output v2](docs/00-performance-improvement/02-rag-response-reliability/03-structured-output-v2-design.md) | schema와 근거 ID 검증 |
 | [Next.js 상담 UI](docs/09-frontend/02-nextjs-chat-ui.md) | UI 범위와 스트리밍 검증 |
 | [Agent 확장 명세](docs/07-langgraph-agent/01-finlife-agent-expansion-spec.md) | Finlife부터 Agent v1까지의 순서 |
 | [README 최신 베이스라인](docs/10-project-presentation/01-readme-baseline.md) | 공개 문서 구성과 Workflow·Agent 표현 기준 |
