@@ -12,6 +12,7 @@ SCRIPT = run_path(
 )
 DATASET_NAME = SCRIPT["DATASET_NAME"]
 create_graph_evaluation_target = SCRIPT["create_graph_evaluation_target"]
+describe_generator = SCRIPT["describe_generator"]
 find_dataset_example = SCRIPT["find_dataset_example"]
 run_full_dataset_experiment = SCRIPT["run_full_dataset_experiment"]
 run_selected_questions_experiment = SCRIPT["run_selected_questions_experiment"]
@@ -77,6 +78,17 @@ def test_create_graph_evaluation_target_formats_graph_result() -> None:
     ]
 
 
+def test_describe_generator_records_backend_and_model(monkeypatch) -> None:
+    """생성 모델 비교에 필요한 설정 기록"""
+    monkeypatch.setenv("CHATBOT_BACKEND", "anthropic")
+    generator = SimpleNamespace(model="claude-haiku-test")
+
+    assert describe_generator(generator) == {
+        "generation_backend": "anthropic",
+        "generation_model": "claude-haiku-test",
+    }
+
+
 def test_find_dataset_example_filters_by_question_id() -> None:
     """Dataset 이름과 질문 ID로 example 하나 조회"""
     example = SimpleNamespace(id="example-id")
@@ -116,6 +128,7 @@ def test_run_selected_questions_experiment_uses_one_worker() -> None:
         question_ids=["A1", "A2"],
         examples=examples,
         faithfulness_evaluator="faithfulness-evaluator",
+        generation_metadata={"generation_backend": "anthropic"},
         evaluate_fn=fake_evaluate,
     )
 
@@ -126,6 +139,7 @@ def test_run_selected_questions_experiment_uses_one_worker() -> None:
     assert captured["client"] is client
     assert captured["metadata"]["question_ids"] == ["A1", "A2"]
     assert captured["metadata"]["pipeline"] == "langgraph-v1"
+    assert captured["metadata"]["generation_backend"] == "anthropic"
     assert captured["evaluators"][1] == "faithfulness-evaluator"
     assert len(captured["evaluators"]) == 2
 
@@ -145,6 +159,7 @@ def test_run_full_dataset_experiment_uses_registered_dataset() -> None:
         client=client,
         target=target,
         faithfulness_evaluator="faithfulness-evaluator",
+        generation_metadata={"generation_model": "claude-haiku-test"},
         evaluate_fn=fake_evaluate,
     )
 
@@ -155,5 +170,6 @@ def test_run_full_dataset_experiment_uses_registered_dataset() -> None:
     assert captured["client"] is client
     assert "question_id" not in captured["metadata"]
     assert captured["metadata"]["pipeline"] == "langgraph-v1"
+    assert captured["metadata"]["generation_model"] == "claude-haiku-test"
     assert captured["evaluators"][1] == "faithfulness-evaluator"
     assert len(captured["evaluators"]) == 2

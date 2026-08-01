@@ -1,6 +1,7 @@
 """LangSmith에서 LangGraph 법령 RAG experiment 실행"""
 
 import argparse
+import os
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,8 +18,8 @@ from chatbot.evaluators import (
     create_faithfulness_evaluator,
     langsmith_retrieval_evaluator,
 )
+from chatbot.generator_backend import create_generator
 from chatbot.graph import create_rag_graph
-from chatbot.ollama_generator import OllamaGenerator
 from chatbot.rag import format_context
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
@@ -26,8 +27,16 @@ from chatbot.vectorstore import open_collection
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_QUESTION_ID = "A1"
-BATCH_EXPERIMENT_PREFIX = "rag-graph-v1-batch"
-FULL_EXPERIMENT_PREFIX = "rag-graph-v1-baseline"
+BATCH_EXPERIMENT_PREFIX = "rag-graph-v1-generation-smoke"
+FULL_EXPERIMENT_PREFIX = "rag-graph-v1-generation-comparison"
+
+
+def describe_generator(generator) -> dict[str, str]:
+    """평가 결과에 남길 생성 backend와 모델 정보"""
+    return {
+        "generation_backend": os.getenv("CHATBOT_BACKEND", "anthropic"),
+        "generation_model": getattr(generator, "model", "unknown"),
+    }
 
 
 def find_dataset_example(client: Client, question_id: str):
@@ -80,6 +89,7 @@ def run_selected_questions_experiment(
     question_ids: list[str],
     examples: list,
     faithfulness_evaluator,
+    generation_metadata: dict[str, str] | None = None,
     evaluate_fn: Callable = evaluate,
 ):
     """선택한 Dataset 문항을 한 요청씩 평가"""
@@ -93,6 +103,7 @@ def run_selected_questions_experiment(
             "question_ids": question_ids,
             "judge_model": JUDGE_MODEL_NAME,
             "pipeline": "langgraph-v1",
+            **(generation_metadata or {}),
         },
         experiment_prefix=BATCH_EXPERIMENT_PREFIX,
         max_concurrency=1,
@@ -104,6 +115,7 @@ def run_full_dataset_experiment(
     client: Client,
     target: Callable,
     faithfulness_evaluator,
+    generation_metadata: dict[str, str] | None = None,
     evaluate_fn: Callable = evaluate,
 ):
     """Dataset 전체 문항을 한 요청씩 실행하고 검색·답변 점수 업로드"""
@@ -116,6 +128,7 @@ def run_full_dataset_experiment(
             "corpus_snapshot": CORPUS_SNAPSHOT,
             "judge_model": JUDGE_MODEL_NAME,
             "pipeline": "langgraph-v1",
+            **(generation_metadata or {}),
         },
         experiment_prefix=FULL_EXPERIMENT_PREFIX,
         max_concurrency=1,
@@ -155,7 +168,8 @@ def main() -> None:
             find_dataset_example(client, question_id) for question_id in question_ids
         ]
 
-    generator = OllamaGenerator()
+    generator = create_generator()
+    generation_metadata = describe_generator(generator)
     encoder = load_encoder()
     collection = open_collection()
     rag_graph = create_rag_graph(
@@ -170,6 +184,7 @@ def main() -> None:
             client=client,
             target=target,
             faithfulness_evaluator=faithfulness_evaluator,
+            generation_metadata=generation_metadata,
         )
     else:
         results = run_selected_questions_experiment(
@@ -178,6 +193,7 @@ def main() -> None:
             question_ids=question_ids,
             examples=examples,
             faithfulness_evaluator=faithfulness_evaluator,
+            generation_metadata=generation_metadata,
         )
 
     print(f"Experiment: {results.experiment_name}")
