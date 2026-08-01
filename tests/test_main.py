@@ -106,31 +106,29 @@ def test_prepare_rag_resources_wraps_graph_when_langfeather_enabled(
 def test_lifespan_loads_local_env_before_backend_selection(monkeypatch) -> None:
     """서버 시작 시 .env를 읽은 뒤 backend 준비"""
     calls = []
-
-    class FakeOllamaGenerator:
-        pass
+    generator = object()
 
     async def run_lifespan():
         state = SimpleNamespace()
         app = SimpleNamespace(state=state)
         async with main_module.lifespan(app):
-            assert isinstance(app.state.generator, FakeOllamaGenerator)
+            assert app.state.generator is generator
 
-    monkeypatch.setenv("CHATBOT_BACKEND", "ollama")
     monkeypatch.setattr(main_module, "load_local_env", lambda: calls.append("env"))
-    monkeypatch.setattr(main_module, "OllamaGenerator", FakeOllamaGenerator)
+    monkeypatch.setattr(
+        main_module,
+        "create_generator",
+        lambda: calls.append("generator") or generator,
+    )
 
     asyncio.run(run_lifespan())
 
-    assert calls == ["env"]
+    assert calls == ["env", "generator"]
 
 
 def test_lifespan_shuts_down_enabled_langfeather(monkeypatch) -> None:
     """서버 종료 시 대기 중인 LangFeather 추적 전송"""
     shutdown_timeouts = []
-
-    class FakeOllamaGenerator:
-        pass
 
     async def run_lifespan():
         state = SimpleNamespace()
@@ -141,9 +139,8 @@ def test_lifespan_shuts_down_enabled_langfeather(monkeypatch) -> None:
                 shutdown=lambda timeout: shutdown_timeouts.append(timeout) or True
             )
 
-    monkeypatch.setenv("CHATBOT_BACKEND", "ollama")
     monkeypatch.setattr(main_module, "load_local_env", lambda: None)
-    monkeypatch.setattr(main_module, "OllamaGenerator", FakeOllamaGenerator)
+    monkeypatch.setattr(main_module, "create_generator", object)
 
     asyncio.run(run_lifespan())
 

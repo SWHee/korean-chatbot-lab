@@ -11,8 +11,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from chatbot.embedding import load_encoder
+from chatbot.generator_backend import create_generator
 from chatbot.graph import create_rag_graph  # 그래프 생성 함수
-from chatbot.ollama_generator import OllamaGenerator
 from chatbot.retriever import DEFAULT_TOP_K
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
@@ -88,16 +88,7 @@ def prepare_rag_resources(app: FastAPI) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """서버 시작 시 선택한 backend의 생성기를 준비하고 종료 시 해제"""
     load_local_env()
-    backend = os.getenv("CHATBOT_BACKEND", "ollama")
-    if backend == "ollama":
-        app.state.generator = OllamaGenerator()
-    elif backend == "hf":
-        # torch 적재 비용 때문에 hf 선택 시에만 import
-        from chatbot.generator import Generator
-
-        app.state.generator = Generator()
-    else:
-        raise ValueError(f"unknown CHATBOT_BACKEND: {backend}")
+    app.state.generator = create_generator()
     try:
         yield
     finally:
