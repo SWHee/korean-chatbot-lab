@@ -162,6 +162,27 @@ def test_routed_workflow_combines_mixed_answer_without_second_generation(
     assert "테스트은행 · 테스트예금" in result["answer"]
 
 
+def test_routed_workflow_clarifies_incomplete_mixed_question() -> None:
+    """법령 의도가 있어도 상품 조건이 부족하면 추가 질문으로 전환"""
+    graph = _create_graph(
+        _analysis(
+            route="mixed",
+            law_question="예금자 보호법을 설명해 주세요.",
+            product_filters=_product_filters() | {"term_months": None},
+            missing_fields=["term_months"],
+            clarifying_question="몇 개월 동안 가입할 예금을 찾으시나요?",
+        )
+    )
+
+    result = graph.invoke(
+        {"question": "예금 상품 추천 및 예금자 보호법도 설명"}
+    )
+
+    assert result["route"] == "clarify"
+    assert result["missing_fields"] == ["term_months"]
+    assert result["answer"] == "몇 개월 동안 가입할 예금을 찾으시나요?"
+
+
 @pytest.mark.parametrize(
     ("analysis", "expected_answer"),
     [

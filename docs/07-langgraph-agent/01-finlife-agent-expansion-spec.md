@@ -341,6 +341,19 @@ limit
   `products`, `partial_failure`, `execution_seconds`
 - 제외: thread, Next.js 연결, Agent 스트리밍
 
+#### 10-1. 첫 수동 실행에서 발견한 route 충돌 보완
+
+- 상태: 완료 (2026-08-02)
+- 재현 질문: `예금 상품 추천 및 예금자 보호법도 설명`
+- 문제: 모델이 불완전한 상품 조건을 `mixed`로 분류하면서 추가 질문 필드도 함께
+  반환해 검증 오류가 HTTP 500으로 전파
+- 판단: 상품 조건이 부족하면 법령 의도가 함께 있어도 `clarify`를 먼저 적용
+- 적용: 분류 Prompt에 우선순위를 명시하고, Python 검증에서 불완전한 `mixed`를
+  `clarify`로 정규화
+- 검증: 실제 질문과 같은 분석 결과가 기간 질문으로 종료되고 조회 Branch를 실행하지 않음
+- 상세 기록:
+  [`불완전한 mixed 질문의 500 오류`](troubleshooting/01-incomplete-mixed-route-validation.md)
+
 ### 11. 선택한 모델의 Tool call 단독 확인
 
 - 목표: Graph 밖에서 Tool 이름과 JSON 인자 생성 확인

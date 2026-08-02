@@ -52,10 +52,11 @@ QUESTION_ANALYSIS_SYSTEM_PROMPT = """당신은 예·적금 금융 상담 챗봇�
 
 - 법령·금융소비자보호 기준 질문은 law로 분류하고 law_question에 검색할 질문을 넣으세요.
 - 예금 또는 적금의 비교·추천 질문에서 상품 종류와 기간이 있으면 product로 분류하세요.
-- 상품 비교와 법령 질문이 함께 있으면 mixed로 분류하세요.
 - 상품을 찾으려는 의도는 있지만 상품 종류 또는 기간이 부족하면 clarify로 분류하세요.
+  법령 질문이 함께 있어도 필요한 상품 조건을 먼저 확인하세요.
   이때 이미 알 수 있는 상품 조건은 product_filters에 보존하고, 빠진 필드만 missing_fields에
   넣은 뒤 한 번에 답할 수 있는 짧은 clarifying_question을 작성하세요.
+- 상품 조건이 모두 있고 법령 질문도 함께 있으면 mixed로 분류하세요.
 - 예·적금 상품과 금융소비자보호 법령 범위 밖 질문은 out_of_scope로 분류하세요.
 - 법령 검색 결과가 부족할 가능성은 clarify 사유가 아닙니다.
 - sort_by는 사용자가 따로 말하지 않으면 base_interest_rate, limit은 3을 사용하세요.
@@ -124,6 +125,38 @@ class QuestionAnalysis(BaseModel):
     product_filters: ProductFilters | None = None
     missing_fields: list[MissingProductField] = Field(default_factory=list)
     clarifying_question: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_incomplete_mixed_route(cls, data):
+        """상품 조건이 부족한 mixed 결과를 추가 질문으로 전환"""
+        if not isinstance(data, dict) or data.get("route") != "mixed":
+            return data
+
+        product_filters = ProductFilters.model_validate(
+            data.get("product_filters") or {}
+        )
+        missing_fields = product_filters.missing_required_fields()
+        if not missing_fields:
+            return data
+
+        normalized_data = dict(data)
+        normalized_data["route"] = "clarify"
+        normalized_data["product_filters"] = product_filters.model_dump()
+        normalized_data["missing_fields"] = missing_fields
+        if not str(data.get("clarifying_question") or "").strip():
+            if missing_fields == ["product_type", "term_months"]:
+                clarifying_question = (
+                    "예금과 적금 중 어떤 상품을 찾으시고, "
+                    "몇 개월 동안 가입할 예정인가요?"
+                )
+            elif missing_fields == ["product_type"]:
+                clarifying_question = "예금과 적금 중 어떤 상품을 찾으시나요?"
+            else:
+                clarifying_question = "몇 개월 동안 가입할 상품을 찾으시나요?"
+            normalized_data["clarifying_question"] = clarifying_question
+
+        return normalized_data
 
     @model_validator(mode="after")
     def validate_route_contract(self):

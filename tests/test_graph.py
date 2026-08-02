@@ -371,6 +371,29 @@ def test_question_analysis_rejects_incomplete_product_route() -> None:
         )
 
 
+def test_question_analysis_normalizes_incomplete_mixed_route() -> None:
+    """불완전한 mixed 분석 결과를 안전한 추가 질문으로 정규화"""
+    analysis = graph_module.QuestionAnalysis.model_validate(
+        {
+            "route": "mixed",
+            "law_question": "예금자 보호법을 설명해 주세요.",
+            "product_filters": {
+                "product_type": "deposit",
+                "term_months": None,
+                "sort_by": "base_interest_rate",
+                "limit": 3,
+            },
+            "missing_fields": [],
+            "clarifying_question": None,
+        }
+    )
+
+    assert analysis.route == "clarify"
+    assert analysis.missing_fields == ["term_months"]
+    assert analysis.clarifying_question == "몇 개월 동안 가입할 상품을 찾으시나요?"
+    assert analysis.law_question == "예금자 보호법을 설명해 주세요."
+
+
 def test_mixed_retrieval_graph_runs_law_and_product_branches_in_parallel(
     monkeypatch,
 ) -> None:
