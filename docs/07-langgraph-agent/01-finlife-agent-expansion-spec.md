@@ -2,8 +2,8 @@
 
 - 최초 작성: 2026-07-24
 - 최근 재정리: 2026-07-30
-- 상태: 10단계 Routed Workflow 비스트리밍 API 완료, 11단계 시작 전
-- 현재 기준선: Git `1aeabc2`의 혼합 병렬 조회와 작업 트리의 Workflow·API 연결
+- 상태: 11단계 Claude Tool call 단독 확인 완료, 12단계 시작 전
+- 현재 기준선: Git `df643fb`의 Routed Workflow API와 작업 트리의 Tool Calling POC
 
 ## 문서 역할
 
@@ -356,10 +356,22 @@ limit
 
 ### 11. 선택한 모델의 Tool call 단독 확인
 
+- 상태: 완료 (2026-08-02)
 - 목표: Graph 밖에서 Tool 이름과 JSON 인자 생성 확인
 - 방식: 현재 기본 API backend의 LangChain ChatModel에 `bind_tools()` 적용
 - 순서: 법령 Tool 하나로 시작한 뒤 두 Tool 제공
 - 검증: `AIMessage.tool_calls`의 이름·인자와 Tool 불필요 질문
+- 결과: Claude Haiku가 법령 질문에는 `search_law_articles`, 12개월 정기예금
+  질문에는 `search_financial_products`와 완성된 비교 조건을 반환하고 인사에는 Tool을
+  호출하지 않음
+- 적용: `langchain-anthropic`, 두 Pydantic Tool 입력 schema,
+  `create_tool_calling_model()`, `invoke_tool_calling_model()` 추가
+- 구조: `agent/tools.py`는 Tool 입력 계약, `agent/model.py`는 ChatModel 생성과
+  `bind_tools()` 호출 담당
+- 안전성: `strict=True`로 이름과 자료형을 제한하고, 지원하지 않는 숫자 범위는
+  Pydantic 로컬 검증으로 유지
+- 상세 기록:
+  [`Anthropic strict Tool schema의 숫자 범위 오류`](troubleshooting/02-anthropic-strict-tool-schema.md)
 - 제외: Agent loop와 FastAPI
 
 Ollama Tool Calling은 오픈웨이트 LoRA·vLLM 실습 결과를 다시 연결할 때 별도 비교한다.
