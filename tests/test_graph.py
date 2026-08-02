@@ -1,5 +1,7 @@
 """법령 RAG StateGraph 실행 흐름 검증"""
 
+from threading import Barrier
+
 import pytest
 
 from chatbot import graph as graph_module
@@ -367,3 +369,134 @@ def test_question_analysis_rejects_incomplete_product_route() -> None:
                 "clarifying_question": None,
             }
         )
+
+
+def test_mixed_retrieval_graph_runs_law_and_product_branches_in_parallel(
+    monkeypatch,
+) -> None:
+    """법령·상품 조회의 병렬 실행과 결과 합류"""
+    branch_start = Barrier(2, timeout=2)
+    articles = [{"law_name": "예금자보호법", "article_no": "제32조"}]
+
+    def fake_retrieve_articles(**kwargs) -> list[dict]:
+        branch_start.wait()
+        return articles
+
+    def fake_fetch_deposit_products() -> dict:
+        branch_start.wait()
+        return _deposit_result()
+
+    monkeypatch.setattr(graph_module, "retrieve_articles", fake_retrieve_articles)
+    monkeypatch.setattr(
+        graph_module,
+        "fetch_deposit_products",
+        fake_fetch_deposit_products,
+    )
+
+    graph = graph_module.create_mixed_retrieval_graph(
+        encoder=object(),
+        collection=object(),
+    )
+    result = graph.invoke(
+        {
+            "law_question": "예금자보호 한도는 얼마인가요?",
+            "product_filters": {
+                "product_type": "deposit",
+                "term_months": 12,
+                "sort_by": "base_interest_rate",
+                "limit": 3,
+            },
+        }
+    )
+
+    assert result["law_status"] == "ok"
+    assert result["articles"] == articles
+    assert result["product_status"] == "ok"
+    assert [product.product_code for product in result["products"]] == [
+        "DEPOSIT-001"
+    ]
+
+
+def test_mixed_retrieval_graph_keeps_law_result_when_product_api_fails(
+    monkeypatch,
+) -> None:
+    """상품 조회 실패를 상태로 남기고 법령 결과 유지"""
+    articles = [{"law_name": "예금자보호법", "article_no": "제32조"}]
+
+    monkeypatch.setattr(
+        graph_module,
+        "retrieve_articles",
+        lambda **kwargs: articles,
+    )
+
+    def raise_finlife_error() -> dict:
+        raise RuntimeError("Finlife API error 101: 잘못된 요청")
+
+    monkeypatch.setattr(
+        graph_module,
+        "fetch_deposit_products",
+        raise_finlife_error,
+    )
+
+    graph = graph_module.create_mixed_retrieval_graph(
+        encoder=object(),
+        collection=object(),
+    )
+    result = graph.invoke(
+        {
+            "law_question": "예금자보호 한도는 얼마인가요?",
+            "product_filters": {
+                "product_type": "deposit",
+                "term_months": 12,
+                "sort_by": "base_interest_rate",
+                "limit": 3,
+            },
+        }
+    )
+
+    assert result["law_status"] == "ok"
+    assert result["articles"] == articles
+    assert result["product_status"] == "error"
+    assert result["products"] == []
+
+
+def test_mixed_retrieval_graph_keeps_products_when_law_retrieval_fails(
+    monkeypatch,
+) -> None:
+    """법령 검색 실패를 상태로 남기고 상품 결과 유지"""
+    def raise_law_error(**kwargs) -> list[dict]:
+        raise RuntimeError("법령 벡터 검색 실패")
+
+    monkeypatch.setattr(
+        graph_module,
+        "retrieve_articles",
+        raise_law_error,
+    )
+    monkeypatch.setattr(
+        graph_module,
+        "fetch_deposit_products",
+        _deposit_result,
+    )
+
+    graph = graph_module.create_mixed_retrieval_graph(
+        encoder=object(),
+        collection=object(),
+    )
+    result = graph.invoke(
+        {
+            "law_question": "예금자보호 한도는 얼마인가요?",
+            "product_filters": {
+                "product_type": "deposit",
+                "term_months": 12,
+                "sort_by": "base_interest_rate",
+                "limit": 3,
+            },
+        }
+    )
+
+    assert result["law_status"] == "error"
+    assert result["articles"] == []
+    assert result["product_status"] == "ok"
+    assert [product.product_code for product in result["products"]] == [
+        "DEPOSIT-001"
+    ]

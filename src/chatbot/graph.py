@@ -31,6 +31,7 @@ class RagState(TypedDict):
 
 
 ProductStatus = Literal["ok", "no_match", "error"]
+LawRetrievalStatus = Literal["ok", "error"]
 FixedRoute = Literal["law", "product"]
 QuestionRoute = Literal[
     "law",
@@ -162,6 +163,46 @@ class QuestionAnalysisState(TypedDict):
     clarifying_question: NotRequired[str | None]
 
 
+class MixedRetrievalState(TypedDict):
+    """법령·상품 병렬 조회의 입력과 결과 상태"""
+
+    law_question: str
+    product_filters: dict[str, object]
+    articles: NotRequired[list[dict]]
+    law_status: NotRequired[LawRetrievalStatus]
+    products: NotRequired[list[DepositProductOption]]
+    product_status: NotRequired[ProductStatus]
+
+
+def _search_deposit_products(
+    *,
+    term_months: int,
+    sort_by: ProductSortBy,
+    limit: int,
+) -> dict:
+    """정기예금 조회 오류와 비교 결과의 Graph State 변환"""
+    try:
+        result = fetch_deposit_products()
+    except (httpx.HTTPError, RuntimeError):
+        return {
+            "products": [],
+            "product_status": "error",
+        }
+
+    normalized_products = normalize_deposit_products(result)
+    comparison = select_deposit_products(
+        normalized_products,
+        term_months=term_months,
+        sort_by=sort_by,
+        limit=limit,
+    )
+    product_status: ProductStatus = "ok" if comparison.products else "no_match"
+    return {
+        "products": comparison.products,
+        "product_status": product_status,
+    }
+
+
 def create_rag_graph(
     generator,
     encoder,
@@ -234,28 +275,11 @@ def create_product_graph():
     """구조화 조건으로 정기예금 후보를 조회하는 단일 Node 그래프"""
 
     def search_products_node(state: ProductState) -> dict:
-        try:
-            result = fetch_deposit_products()
-        except (httpx.HTTPError, RuntimeError):
-            return {
-                "products": [],
-                "product_status": "error",
-            }
-
-        normalized_products = normalize_deposit_products(result)
-        comparison = select_deposit_products(
-            normalized_products,
+        return _search_deposit_products(
             term_months=state["term_months"],
             sort_by=state["sort_by"],
             limit=state["limit"],
         )
-        product_status: ProductStatus = (
-            "ok" if comparison.products else "no_match"
-        )
-        return {
-            "products": comparison.products,
-            "product_status": product_status,
-        }
 
     builder = StateGraph(ProductState)
 
@@ -322,5 +346,67 @@ def create_question_analysis_graph(generator):
 
     builder.add_edge(START, "analyze_question")
     builder.add_edge("analyze_question", END)
+
+    return builder.compile()
+
+
+def create_mixed_retrieval_graph(
+    encoder,
+    collection,
+    top_k: int = DEFAULT_TOP_K,
+):
+    """법령과 정기예금 후보를 병렬로 조회하는 혼합 경로 POC"""
+
+    def retrieve_law_node(state: MixedRetrievalState) -> dict:
+        try:
+            articles = retrieve_articles(
+                encoder=encoder,
+                collection=collection,
+                question=state["law_question"],
+                top_k=top_k,
+            )
+        except RuntimeError:
+            return {
+                "articles": [],
+                "law_status": "error",
+            }
+
+        return {
+            "articles": articles,
+            "law_status": "ok",
+        }
+
+    def search_products_node(state: MixedRetrievalState) -> dict:
+        product_filters = ProductFilters.model_validate(state["product_filters"])
+        missing_fields = product_filters.missing_required_fields()
+        if missing_fields:
+            raise ValueError(
+                f"mixed retrieval requires product fields: {missing_fields}"
+            )
+        if product_filters.product_type != "deposit":
+            raise ValueError("mixed retrieval currently supports deposit only")
+
+        return _search_deposit_products(
+            term_months=product_filters.term_months,
+            sort_by=product_filters.sort_by,
+            limit=product_filters.limit,
+        )
+
+    def join_results_node(state: MixedRetrievalState) -> dict:
+        # 두 Branch 결과는 이미 State에 병합된 상태
+        return {}
+
+    builder = StateGraph(MixedRetrievalState)
+
+    builder.add_node("retrieve_law", retrieve_law_node)
+    builder.add_node("search_products", search_products_node)
+    builder.add_node("join_results", join_results_node)
+
+    # START에서 나뉜 두 Edge는 같은 Graph step에서 병렬 실행
+    builder.add_edge(START, "retrieve_law")
+    builder.add_edge(START, "search_products")
+    # 서로 다른 State 키를 쓰므로 별도 Reducer 없이 두 결과 병합
+    builder.add_edge(["retrieve_law", "search_products"], "join_results")
+    builder.add_edge("join_results", END)
 
     return builder.compile()

@@ -304,10 +304,14 @@ limit
 
 ### 8. 혼합 병렬 경로와 부분 실패
 
+- 상태: 완료 (2026-08-02)
 - 목표: 법령과 상품 Branch를 병렬 실행한 뒤 합류
-- 상태: 두 Branch가 서로 다른 키를 갱신하므로 별도 Reducer 미사용
+- State: 두 Branch가 서로 다른 키를 갱신하므로 별도 Reducer 미사용
 - 검증: 양쪽 성공, 법령만 성공, 상품만 성공
 - 주의: 예상 가능한 외부 오류만 Node에서 상태로 변환
+- 결과: `START`에서 법령·정기예금 조회를 병렬 실행하고 두 Node 완료 후 합류
+- 적용: `create_mixed_retrieval_graph()`와 `MixedRetrievalState` 추가
+- 현재 범위: 기존 Product Node와 같은 정기예금 비교, 적금 조회 연결 전
 - 제외: Agent의 동적 Tool 선택
 
 ### 9. Routed Workflow v1 답변 구성
