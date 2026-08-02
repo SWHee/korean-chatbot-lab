@@ -11,13 +11,21 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from chatbot.embedding import load_encoder
+from chatbot.finlife import DepositProductOption
 from chatbot.generator_backend import create_generator
-from chatbot.graph import create_rag_graph  # 그래프 생성 함수
+from chatbot.graph import (
+    LawStatus,
+    ProductStatus,
+    QuestionRoute,
+    create_rag_graph,
+    create_routed_workflow_graph,
+)
 from chatbot.retriever import DEFAULT_TOP_K
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
 
 LANGFEATHER_TRACE_NAME = "korean-chatbot-rag"
+LANGFEATHER_WORKFLOW_TRACE_NAME = "korean-chatbot-routed-workflow"
 LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS = 2.0
 
 
@@ -55,6 +63,25 @@ class RagResponse(BaseModel):
     generation_seconds: float
 
 
+class WorkflowRequest(BaseModel):
+    """Routed Workflow에 전달할 사용자 질문 검증"""
+
+    question: str = Field(min_length=1)
+
+
+class WorkflowResponse(BaseModel):
+    """route별 답변과 법령·상품 실행 결과"""
+
+    answer: str
+    route: QuestionRoute
+    law_status: LawStatus | None = None
+    product_status: ProductStatus | None = None
+    sources: list[RagSource]
+    products: list[DepositProductOption]
+    partial_failure: bool
+    execution_seconds: float
+
+
 def prepare_rag_resources(app: FastAPI) -> None:
     """필요 시 RAG 임베딩 모델과 벡터스토어 준비"""
     if not hasattr(app.state, "encoder"):
@@ -85,6 +112,26 @@ def prepare_rag_resources(app: FastAPI) -> None:
         app.state.rag_graph = rag_graph
 
 
+def prepare_workflow_resources(app: FastAPI) -> None:
+    """공유 RAG 자원으로 Routed Workflow Graph 준비"""
+    if hasattr(app.state, "routed_workflow_graph"):
+        return
+
+    prepare_rag_resources(app)
+    workflow_graph = create_routed_workflow_graph(
+        generator=app.state.generator,
+        encoder=app.state.encoder,
+        collection=app.state.collection,
+        top_k=DEFAULT_TOP_K,
+    )
+    if app.state.langfeather_enabled:
+        workflow_graph = app.state.langfeather_sdk.wrap_runnable(
+            workflow_graph,
+            name=LANGFEATHER_WORKFLOW_TRACE_NAME,
+        )
+    app.state.routed_workflow_graph = workflow_graph
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """서버 시작 시 선택한 backend의 생성기를 준비하고 종료 시 해제"""
@@ -104,6 +151,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "encoder",
             "collection",
             "rag_graph",
+            "routed_workflow_graph",
             "langfeather_enabled",
             "langfeather_sdk",
         ):
@@ -166,4 +214,46 @@ async def ask_rag_stream(
             stream_mode="custom",
         ),
         media_type="text/plain; charset=utf-8",
+    )
+
+
+@app.post("/ask-workflow", response_model=WorkflowResponse)
+async def ask_workflow(
+    payload: WorkflowRequest,
+    request: Request,
+) -> WorkflowResponse:
+    """질문을 route별 Workflow로 처리하고 전체 실행 결과 반환"""
+    await asyncio.to_thread(prepare_workflow_resources, request.app)
+
+    started_at = perf_counter()
+    graph_result = await asyncio.to_thread(
+        request.app.state.routed_workflow_graph.invoke,
+        input={"question": payload.question},
+    )
+    execution_seconds = perf_counter() - started_at
+
+    route = graph_result["route"]
+    law_status = graph_result.get("law_status")
+    product_status = graph_result.get("product_status")
+    law_failed = law_status == "error"
+    product_failed = product_status == "error"
+    partial_failure = route == "mixed" and law_failed != product_failed
+
+    return WorkflowResponse(
+        answer=graph_result["answer"],
+        route=route,
+        law_status=law_status,
+        product_status=product_status,
+        sources=[
+            RagSource(
+                law_name=article["law_name"],
+                article_no=article["article_no"],
+                effective_date=article["effective_date"],
+                similarity=article["similarity"],
+            )
+            for article in graph_result.get("articles", [])
+        ],
+        products=graph_result.get("products", []),
+        partial_failure=partial_failure,
+        execution_seconds=execution_seconds,
     )

@@ -15,7 +15,11 @@ from chatbot.finlife import (
     normalize_deposit_products,  # 원본 상품·옵션을 내부 모델로 변환
     select_deposit_products,  # 기간·금리 기준 상위 후보 선택
 )
-from chatbot.rag import answer_question, stream_answer_question
+from chatbot.rag import (
+    INSUFFICIENT_EVIDENCE_MESSAGE,
+    answer_question,
+    stream_answer_question,
+)
 from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
 
 
@@ -32,6 +36,7 @@ class RagState(TypedDict):
 
 ProductStatus = Literal["ok", "no_match", "error"]
 LawRetrievalStatus = Literal["ok", "error"]
+LawStatus = Literal["ok", "insufficient_evidence", "error"]
 FixedRoute = Literal["law", "product"]
 QuestionRoute = Literal[
     "law",
@@ -55,6 +60,21 @@ QUESTION_ANALYSIS_SYSTEM_PROMPT = """당신은 예·적금 금융 상담 챗봇�
 - 법령 검색 결과가 부족할 가능성은 clarify 사유가 아닙니다.
 - sort_by는 사용자가 따로 말하지 않으면 base_interest_rate, limit은 3을 사용하세요.
 - 상품 종류는 deposit 또는 saving만 사용하세요."""
+
+OUT_OF_SCOPE_MESSAGE = (
+    "현재는 예금·적금 상품 비교와 금융소비자보호 법령 안내를 도와드릴 수 있어요.\n"
+    "예: ‘12개월 정기예금을 비교해 주세요’ 또는 ‘예금자보호 한도를 알려주세요’"
+)
+LAW_RETRIEVAL_ERROR_MESSAGE = (
+    "관련 법령 정보를 불러오지 못했어요.\n잠시 후 다시 질문해 주세요."
+)
+PRODUCT_API_ERROR_MESSAGE = (
+    "금융상품 공시 정보를 불러오지 못했어요.\n잠시 후 다시 질문해 주세요."
+)
+PRODUCT_SORT_LABELS: dict[ProductSortBy, str] = {
+    "base_interest_rate": "기본금리",
+    "max_interest_rate": "최고금리",
+}
 
 
 class ProductState(TypedDict):
@@ -174,6 +194,69 @@ class MixedRetrievalState(TypedDict):
     product_status: NotRequired[ProductStatus]
 
 
+class RoutedWorkflowState(TypedDict):
+    """질문 분석부터 최종 답변까지 공유하는 Workflow State"""
+
+    question: str
+    route: NotRequired[QuestionRoute]
+    law_question: NotRequired[str | None]
+    product_filters: NotRequired[dict[str, object] | None]
+    missing_fields: NotRequired[list[MissingProductField]]
+    clarifying_question: NotRequired[str | None]
+    articles: NotRequired[list[dict]]
+    law_status: NotRequired[LawStatus]
+    law_answer: NotRequired[str]
+    products: NotRequired[list[DepositProductOption]]
+    product_status: NotRequired[ProductStatus]
+    product_answer: NotRequired[str]
+    answer: NotRequired[str]
+
+
+def _analyze_question(generator, question: str) -> dict:
+    """자연어 질문의 구조화 route 분석"""
+    analysis = generator.generate_structured(
+        messages=[
+            {
+                "role": "system",
+                "content": QUESTION_ANALYSIS_SYSTEM_PROMPT,
+            },
+            {
+                "role": "user",
+                "content": f"질문:\n{question}",
+            },
+        ],
+        response_model=QuestionAnalysis,
+    )
+    return analysis.model_dump()
+
+
+def _retrieve_law_articles(
+    *,
+    encoder,
+    collection,
+    question: str,
+    top_k: int,
+) -> dict:
+    """법령 검색 결과와 예상 가능한 오류 상태 변환"""
+    try:
+        articles = retrieve_articles(
+            encoder=encoder,
+            collection=collection,
+            question=question,
+            top_k=top_k,
+        )
+    except RuntimeError:
+        return {
+            "articles": [],
+            "law_status": "error",
+        }
+
+    return {
+        "articles": articles,
+        "law_status": "ok",
+    }
+
+
 def _search_deposit_products(
     *,
     term_months: int,
@@ -203,6 +286,67 @@ def _search_deposit_products(
     }
 
 
+def _require_deposit_filters(raw_filters: dict[str, object]) -> ProductFilters:
+    """정기예금 조회에 필요한 구조화 조건 검증"""
+    product_filters = ProductFilters.model_validate(raw_filters)
+    missing_fields = product_filters.missing_required_fields()
+    if missing_fields:
+        raise ValueError(
+            f"product retrieval requires product fields: {missing_fields}"
+        )
+    if product_filters.product_type != "deposit":
+        raise ValueError("product retrieval currently supports deposit only")
+    return product_filters
+
+
+def _format_interest_rate(rate: float | None) -> str:
+    """공시 금리의 화면 표시 문자열"""
+    return "미공시" if rate is None else f"{rate:.2f}%"
+
+
+def _format_disclosure_month(disclosure_month: str) -> str:
+    """YYYYMM 공시월의 한국어 표시"""
+    if len(disclosure_month) != 6 or not disclosure_month.isdigit():
+        return disclosure_month
+    return f"{disclosure_month[:4]}년 {disclosure_month[4:]}월"
+
+
+def _render_product_answer(
+    *,
+    product_filters: ProductFilters,
+    products: list[DepositProductOption],
+    product_status: ProductStatus,
+) -> str:
+    """정기예금 조회 상태와 후보의 사용자용 답변 변환"""
+    term_months = product_filters.term_months
+    if product_status == "error":
+        return PRODUCT_API_ERROR_MESSAGE
+    if product_status == "no_match":
+        return (
+            f"{term_months}개월 정기예금 중 비교할 수 있는 상품을 찾지 못했어요.\n"
+            "기간이나 비교 기준을 바꿔 다시 확인해 주세요."
+        )
+
+    comparison_basis = PRODUCT_SORT_LABELS[product_filters.sort_by]
+    product_lines = []
+    for index, product in enumerate(products, start=1):
+        product_lines.append(
+            f"{index}. {product.company_name} · {product.product_name}\n"
+            f"   기본금리 {_format_interest_rate(product.base_interest_rate)} · "
+            f"최고금리 {_format_interest_rate(product.max_interest_rate)} · "
+            f"공시월 {_format_disclosure_month(product.disclosure_month)}"
+        )
+
+    return (
+        f"{term_months}개월 정기예금을 {comparison_basis} 기준으로 비교했어요.\n\n"
+        + "\n\n".join(product_lines)
+        + "\n\n공시 정보는 조회 시점 기준이며, 가입 전 금융회사의 "
+        "최신 상품설명서를 확인해 주세요."
+    )
+
+
+# Graph 확장 순서
+# 법령 RAG → 상품 Node → 고정 분기 → 질문 분석 → 혼합 병렬 → 전체 Workflow
 def create_rag_graph(
     generator,
     encoder,
@@ -325,20 +469,7 @@ def create_question_analysis_graph(generator):
     """자연어 질문을 구조화 route State로 변환하는 단일 Node 그래프"""
 
     def analyze_question_node(state: QuestionAnalysisState) -> dict:
-        analysis = generator.generate_structured(
-            messages=[
-                {
-                    "role": "system",
-                    "content": QUESTION_ANALYSIS_SYSTEM_PROMPT,
-                },
-                {
-                    "role": "user",
-                    "content": f"질문:\n{state['question']}",
-                },
-            ],
-            response_model=QuestionAnalysis,
-        )
-        return analysis.model_dump()
+        return _analyze_question(generator, state["question"])
 
     builder = StateGraph(QuestionAnalysisState)
 
@@ -358,33 +489,15 @@ def create_mixed_retrieval_graph(
     """법령과 정기예금 후보를 병렬로 조회하는 혼합 경로 POC"""
 
     def retrieve_law_node(state: MixedRetrievalState) -> dict:
-        try:
-            articles = retrieve_articles(
-                encoder=encoder,
-                collection=collection,
-                question=state["law_question"],
-                top_k=top_k,
-            )
-        except RuntimeError:
-            return {
-                "articles": [],
-                "law_status": "error",
-            }
-
-        return {
-            "articles": articles,
-            "law_status": "ok",
-        }
+        return _retrieve_law_articles(
+            encoder=encoder,
+            collection=collection,
+            question=state["law_question"],
+            top_k=top_k,
+        )
 
     def search_products_node(state: MixedRetrievalState) -> dict:
-        product_filters = ProductFilters.model_validate(state["product_filters"])
-        missing_fields = product_filters.missing_required_fields()
-        if missing_fields:
-            raise ValueError(
-                f"mixed retrieval requires product fields: {missing_fields}"
-            )
-        if product_filters.product_type != "deposit":
-            raise ValueError("mixed retrieval currently supports deposit only")
+        product_filters = _require_deposit_filters(state["product_filters"])
 
         return _search_deposit_products(
             term_months=product_filters.term_months,
@@ -408,5 +521,141 @@ def create_mixed_retrieval_graph(
     # 서로 다른 State 키를 쓰므로 별도 Reducer 없이 두 결과 병합
     builder.add_edge(["retrieve_law", "search_products"], "join_results")
     builder.add_edge("join_results", END)
+
+    return builder.compile()
+
+
+def create_routed_workflow_graph(
+    generator,
+    encoder,
+    collection,
+    top_k: int = DEFAULT_TOP_K,
+):
+    """질문 분석 결과를 route별 최종 답변으로 연결하는 Workflow v1"""
+
+    def analyze_question_node(state: RoutedWorkflowState) -> dict:
+        return _analyze_question(generator, state["question"])
+
+    def select_route(state: RoutedWorkflowState) -> QuestionRoute:
+        return state["route"]
+
+    def retrieve_law_node(state: RoutedWorkflowState) -> dict:
+        return _retrieve_law_articles(
+            encoder=encoder,
+            collection=collection,
+            question=state["law_question"],
+            top_k=top_k,
+        )
+
+    def generate_law_node(state: RoutedWorkflowState) -> dict:
+        if state["law_status"] == "error":
+            return {"law_answer": LAW_RETRIEVAL_ERROR_MESSAGE}
+
+        law_answer = answer_question(
+            generator=generator,
+            question=state["law_question"],
+            articles=state["articles"],
+        )
+        law_status: LawStatus = (
+            "insufficient_evidence"
+            if law_answer == INSUFFICIENT_EVIDENCE_MESSAGE
+            else "ok"
+        )
+        return {
+            "law_answer": law_answer,
+            "law_status": law_status,
+        }
+
+    def search_products_node(state: RoutedWorkflowState) -> dict:
+        product_filters = _require_deposit_filters(state["product_filters"])
+        return _search_deposit_products(
+            term_months=product_filters.term_months,
+            sort_by=product_filters.sort_by,
+            limit=product_filters.limit,
+        )
+
+    def render_products_node(state: RoutedWorkflowState) -> dict:
+        product_filters = _require_deposit_filters(state["product_filters"])
+        return {
+            "product_answer": _render_product_answer(
+                product_filters=product_filters,
+                products=state["products"],
+                product_status=state["product_status"],
+            )
+        }
+
+    def finish_single_route_node(state: RoutedWorkflowState) -> dict:
+        if state["route"] == "law":
+            return {"answer": state["law_answer"]}
+        return {"answer": state["product_answer"]}
+
+    def begin_mixed_node(state: RoutedWorkflowState) -> dict:
+        # 분석 결과를 유지한 채 두 조회 Branch의 시작점 역할
+        return {}
+
+    def compose_mixed_node(state: RoutedWorkflowState) -> dict:
+        return {
+            "answer": (
+                f"법령 안내\n{state['law_answer']}\n\n"
+                f"상품 비교\n{state['product_answer']}"
+            )
+        }
+
+    def ask_clarifying_question_node(state: RoutedWorkflowState) -> dict:
+        return {"answer": state["clarifying_question"]}
+
+    def explain_scope_node(state: RoutedWorkflowState) -> dict:
+        return {"answer": OUT_OF_SCOPE_MESSAGE}
+
+    builder = StateGraph(RoutedWorkflowState)
+
+    builder.add_node("analyze_question", analyze_question_node)
+    builder.add_node("retrieve_law", retrieve_law_node)
+    builder.add_node("generate_law", generate_law_node)
+    builder.add_node("search_products", search_products_node)
+    builder.add_node("render_products", render_products_node)
+    builder.add_node("finish_single_route", finish_single_route_node)
+    builder.add_node("begin_mixed", begin_mixed_node)
+    # 동일한 함수를 다른 Node 이름으로 등록해 mixed 경로를 그래프에 그대로 노출
+    builder.add_node("mixed_retrieve_law", retrieve_law_node)
+    builder.add_node("mixed_generate_law", generate_law_node)
+    builder.add_node("mixed_search_products", search_products_node)
+    builder.add_node("mixed_render_products", render_products_node)
+    builder.add_node("compose_mixed", compose_mixed_node)
+    builder.add_node("ask_clarifying_question", ask_clarifying_question_node)
+    builder.add_node("explain_scope", explain_scope_node)
+
+    builder.add_edge(START, "analyze_question")
+    builder.add_conditional_edges(
+        "analyze_question",
+        select_route,
+        {
+            "law": "retrieve_law",
+            "product": "search_products",
+            "mixed": "begin_mixed",
+            "clarify": "ask_clarifying_question",
+            "out_of_scope": "explain_scope",
+        },
+    )
+
+    builder.add_edge("retrieve_law", "generate_law")
+    builder.add_edge("generate_law", "finish_single_route")
+    builder.add_edge("search_products", "render_products")
+    builder.add_edge("render_products", "finish_single_route")
+    builder.add_edge("finish_single_route", END)
+
+    # mixed는 조회와 렌더링까지 병렬 처리한 뒤 두 답변이 준비되면 합류
+    builder.add_edge("begin_mixed", "mixed_retrieve_law")
+    builder.add_edge("begin_mixed", "mixed_search_products")
+    builder.add_edge("mixed_retrieve_law", "mixed_generate_law")
+    builder.add_edge("mixed_search_products", "mixed_render_products")
+    builder.add_edge(
+        ["mixed_generate_law", "mixed_render_products"],
+        "compose_mixed",
+    )
+    builder.add_edge("compose_mixed", END)
+
+    builder.add_edge("ask_clarifying_question", END)
+    builder.add_edge("explain_scope", END)
 
     return builder.compile()

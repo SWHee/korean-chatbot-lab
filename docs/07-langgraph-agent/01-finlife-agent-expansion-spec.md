@@ -2,8 +2,8 @@
 
 - 최초 작성: 2026-07-24
 - 최근 재정리: 2026-07-30
-- 상태: 4단계 적금 endpoint 계약 확인 완료, 5단계 시작 전
-- 현재 기준선: Git `aa40ed8`의 법령 RAG v2와 작업 트리의 예·적금 client·정기예금 비교
+- 상태: 10단계 Routed Workflow 비스트리밍 API 완료, 11단계 시작 전
+- 현재 기준선: Git `1aeabc2`의 혼합 병렬 조회와 작업 트리의 Workflow·API 연결
 
 ## 문서 역할
 
@@ -316,6 +316,7 @@ limit
 
 ### 9. Routed Workflow v1 답변 구성
 
+- 상태: 완료 (2026-08-02)
 - 목표: 모든 route가 사용자에게 표시할 `answer` 생성
 - 법령: 현재 `answer_question()` 재사용
 - 상품: 후보 순서, 비교 기준, 공시월, 기본·최고금리를 일정한 형식으로 렌더링
@@ -323,13 +324,21 @@ limit
 - clarify: 한 번에 가장 중요한 조건 하나를 쉬운 선택지와 함께 질문
 - out-of-scope: 현재 지원 범위와 다시 물을 수 있는 예시 안내
 - 검증: 정상, 근거 부족, 결과 없음, 한쪽 실패
+- 결과: 다섯 route가 모두 최종 `answer`를 반환하고 mixed는 두 Branch 완료 후 결합
+- 적용: `create_routed_workflow_graph()`와 결정적인 상품 답변 렌더러 추가
+- 현재 범위: 정기예금, 비스트리밍 Graph 호출, FastAPI 연결 전
 
 ### 10. Routed Workflow 비스트리밍 API
 
+- 상태: 완료 (2026-08-02)
 - 목표: 새 Workflow를 기존 법령 endpoint와 나란히 실행
 - 응답: 답변, route, 상태, 법령·상품 출처, 시간, 부분 실패
 - 검증: FastAPI 정상 1건과 중요한 실패 1건
 - 유지: `/ask-rag`, `/ask-rag/stream`
+- 결과: `/ask-workflow`가 mixed 정상·상품 Branch 실패를 하나의 JSON 계약으로 반환
+- 적용: 기존 RAG 자원을 공유하고 LangFeather 활성화 시 Workflow Graph도 별도 추적
+- 응답 필드: `answer`, `route`, `law_status`, `product_status`, `sources`,
+  `products`, `partial_failure`, `execution_seconds`
 - 제외: thread, Next.js 연결, Agent 스트리밍
 
 ### 11. 선택한 모델의 Tool call 단독 확인
