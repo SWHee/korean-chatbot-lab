@@ -7,3 +7,6 @@
 
 # Derived vector index (scripts/build_index.py로 재생성)
 /data/index/
+
+# Local Graphify output
+/graphify-out/
