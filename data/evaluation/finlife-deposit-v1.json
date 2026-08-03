@@ -1,0 +1,13 @@
+{
+  "baseList": [
+    {"dcls_month": "202608", "fin_co_no": "001", "fin_prdt_cd": "DEP-001", "kor_co_nm": "가나다은행", "fin_prdt_nm": "안정 정기예금"},
+    {"dcls_month": "202608", "fin_co_no": "002", "fin_prdt_cd": "DEP-002", "kor_co_nm": "라마은행", "fin_prdt_nm": "든든 정기예금"},
+    {"dcls_month": "202608", "fin_co_no": "003", "fin_prdt_cd": "DEP-003", "kor_co_nm": "바사은행", "fin_prdt_nm": "차곡 정기예금"}
+  ],
+  "optionList": [
+    {"dcls_month": "202608", "fin_co_no": "001", "fin_prdt_cd": "DEP-001", "save_trm": "6", "intr_rate": 2.90, "intr_rate2": 3.30},
+    {"dcls_month": "202608", "fin_co_no": "001", "fin_prdt_cd": "DEP-001", "save_trm": "12", "intr_rate": 3.10, "intr_rate2": 3.60},
+    {"dcls_month": "202608", "fin_co_no": "002", "fin_prdt_cd": "DEP-002", "save_trm": "12", "intr_rate": 3.20, "intr_rate2": 3.50},
+    {"dcls_month": "202608", "fin_co_no": "003", "fin_prdt_cd": "DEP-003", "save_trm": "24", "intr_rate": 3.30, "intr_rate2": 3.70}
+  ]
+}

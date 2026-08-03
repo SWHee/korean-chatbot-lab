@@ -2,8 +2,8 @@
 
 - 최초 작성: 2026-07-24
 - 최근 재정리: 2026-07-30
-- 상태: 13단계 SQLite Checkpointer POC 완료, 14단계 시작 전
-- 현재 기준선: SQLite 단기 기억 기반 ToolNode Agent loop와 Routed Workflow v1
+- 상태: 15단계 Dataset·fixture 계약 완료, evaluator 구현 전
+- 현재 기준선: SQLite 멀티턴 조건 병합 기반 ToolNode Agent loop와 Agent 개발 Dataset
 
 ## 문서 역할
 
@@ -17,6 +17,8 @@
   [`외부 데이터와 API`](../06-other/01-external-data-sources.md)
 - Agent 평가가 기존 24문항과 달라지는 이유:
   [`RAG 평가에서 Agent 평가로 넘어가기 전에 정리한 판단`](../03-langsmith-evaluation/12-agent-evaluation-research.md)
+- Agent 개발 Dataset의 현재 계약과 등록 경계:
+  [`Agent 개발 Dataset 계약`](05-agent-evaluation-dataset-contract.md)
 - 현재 법령 Graph와 LCEL의 역할:
   [`LangGraph로 마이그레이션한다는 의미`](../04-langgraph-migration/03-what-langgraph-migration-means.md)
 - Agent 확장 전 생성 모델 전환 결정:
@@ -413,17 +415,21 @@ volume을 연결한다. Compose 수정과 재생성 검증은 실제 Agent 배�
 
 ### 14. 멀티턴 Clarify POC
 
+- 상태: 완료 (2026-08-03)
 - 목표: 모호한 첫 질문과 다음 답변을 같은 thread에서 합쳐 상품 조회
 - 상태: `messages`, `product_preferences`, `missing_fields`
-- 분석: 7단계 질문 분석을 현재 턴과 기존 상품 조건을 병합하도록 확장
+- 분석: 현재 메시지와 기존 상품 조건을 구조화 분석한 뒤 명시 조건만 병합
 - 흐름: 추가 질문을 반환하고 END한 뒤 다음 요청에서 같은 thread로 재실행
 - 기본 정책: 필수 조건 하나씩 질문하고 숨은 조건을 추측하지 않음
-- 검증: `"금융상품 추천"` → 상품 유형 질문 → `"적금, 12개월"` → 상품 Tool 호출
-- 추가 검증: 새 thread에는 이전 조건이 섞이지 않음
+- 검증: `"금융상품 추천"` → 상품 유형 질문 → `"정기예금, 12개월"` → 상품 Tool 호출 완료
+- 추가 검증: 새 thread에는 이전 조건이 섞이지 않음 완료
+- 적용: `agent/turn_analysis.py`의 구조화 TurnIntent와 `create_multi_turn_agent_graph()`
+- 안전성: Tool 호출 횟수·반복 기록은 매 사용자 턴마다 초기화
 - 제외: `interrupt`, 장기 사용자 프로필, 민감한 소득·자산 수집, UI
 
 ### 15. Agent Dataset과 기준선
 
+- 상태: Dataset·fixture 계약 완료 (2026-08-03), 첫 Experiment 실행 전
 - 시점: Tool schema, 반복 종료, SQLite thread, 두 턴 조건 병합이 안정된 뒤
 - 개발 Dataset: 32사례
 - 빠른 확인: 같은 Dataset 중 대표 12사례
@@ -432,6 +438,10 @@ volume을 연결한다. Compose 수정과 재생성 검증은 실제 Agent 배�
 - clarify 평가: 첫 추가 질문과 다음 답변 이후 조건 병합을 하나의 실행 단위로 평가
 - 평가: Tool 선택, 인자, 호출 집합·반복, 조건 기억, 근거 일치, 최종 답변 분리
 - 재현성: 상품 Tool은 고정 fixture, live API는 연결 smoke만 사용
+- 적용: `data/evaluation/agent-v1-dev.jsonl`, `finlife-deposit-v1.json`,
+  `agent/evaluation.py`
+- 현재 완료: 32사례 분포, 8개 두 턴 trajectory, 상품 Tool fixture 연결을 코드 계약으로 검증
+- 다음 단위: fixture를 주입한 Agent evaluation target과 결정적 Tool·인자·경로 evaluator
 
 기존 24문항은 Agent 점수에 합치지 않고 법령 경로 회귀 평가로 유지한다. 결정적인
 Tool·인자·상품 값은 코드로 평가하고, 문장 도움 정도만 Judge와 사람 검토를 사용한다.
