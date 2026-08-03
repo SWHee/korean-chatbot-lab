@@ -2,7 +2,7 @@
 
 - 최초 작성: 2026-07-24
 - 최근 재정리: 2026-07-30
-- 상태: 16단계 비스트리밍 Agent API 완료, 15단계 evaluator 구현·17단계 시작 전
+- 상태: 17단계 Agent SSE API 완료, 15단계 evaluator 구현·18단계 시작 전
 - 현재 기준선: SQLite 멀티턴 조건 병합 기반 Agent API와 Agent 개발 Dataset
 
 ## 문서 역할
@@ -465,11 +465,16 @@ Agent가 느리거나 Tool 선택이 불안정하면 Routed Workflow v1을 기�
 
 ### 17. Agent 이벤트 스트리밍 API
 
+- 상태: 완료 (2026-08-03)
 - 목표: 진행 상태와 최종 답변 조각을 구분한 별도 stream 계약
 - 이벤트: `status`, `token`, `result`, `error`
 - 상태 예시: 질문 분석, 법령 검색, 상품 조회, 답변 생성
 - LangGraph 모드: 필요에 따라 `updates`, `messages`, `custom` 조합
 - 검증: Tool 진행 상태, 최종 답변 조각, 추가 질문, 오류 종료
+- 적용: `/ask-agent/stream`, Graph `custom` event와 `values` 최종 상태 결합
+- 결과: `analyze`, `tools`, `generate` 상태와 Claude text chunk를 SSE로 전달하고,
+  완료 시 구조화 `result` 이벤트 반환
+- API 단위 검증: status·token·result SSE 순서와 Tool 없는 clarify 응답 확인
 - 주의: 현재 RAG의 순수 텍스트 stream 계약을 덮어쓰지 않음
 
 ### 18. Next.js 멀티턴 Agent UI

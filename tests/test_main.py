@@ -436,7 +436,8 @@ def test_ask_agent_returns_thread_tools_sources_and_products(monkeypatch) -> Non
             assert input == {
                 "messages": [
                     HumanMessage(content="12개월 정기예금과 예금자보호를 알려주세요.")
-                ]
+                ],
+                "streaming": False,
             }
             assert config == {"configurable": {"thread_id": "thread-1"}}
             return {
@@ -579,3 +580,46 @@ def test_ask_agent_returns_clarifying_question_without_tools() -> None:
     assert response.tools == []
     assert response.missing_fields == ["product_type", "term_months"]
     assert "예금과 적금" in response.answer
+
+
+def test_ask_agent_stream_returns_status_token_and_result_events() -> None:
+    """Agent Graph custom stream을 SSE 이벤트로 전달"""
+    class FakeAgentGraph:
+        def stream(self, *, input: dict, config: dict, stream_mode: list[str]):
+            assert input == {
+                "messages": [HumanMessage(content="안녕하세요.")],
+                "streaming": True,
+            }
+            assert config == {"configurable": {"thread_id": "thread-stream"}}
+            assert stream_mode == ["custom", "values"]
+            yield "custom", {"event": "status", "stage": "analyze"}
+            yield "custom", {"event": "token", "text": "안녕"}
+            yield "custom", {"event": "token", "text": "하세요"}
+            yield "values", {
+                "route": "ready",
+                "product_preferences": {},
+                "missing_fields": [],
+                "messages": [
+                    input["messages"][0],
+                    AIMessage(content="안녕하세요"),
+                ],
+            }
+
+    async def collect_body():
+        request = create_rag_request()
+        request.app.state.agent_graph = FakeAgentGraph()
+        response = await main_module.ask_agent_stream(
+            main_module.AgentRequest(thread_id="thread-stream", message="안녕하세요."),
+            request,
+        )
+        chunks = []
+        async for chunk in response.body_iterator:
+            chunks.append(chunk.decode() if isinstance(chunk, bytes) else chunk)
+        return response, "".join(chunks)
+
+    response, body = asyncio.run(collect_body())
+
+    assert response.media_type == "text/event-stream"
+    assert 'event: status\ndata: {"stage": "analyze"}' in body
+    assert 'event: token\ndata: {"text": "안녕"}' in body
+    assert 'event: result\ndata: {"thread_id": "thread-stream"' in body

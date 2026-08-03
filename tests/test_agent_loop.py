@@ -1,6 +1,6 @@
 """ToolNode 기반 단일 요청 Agent loop 검증"""
 
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
 from langchain_core.tools import tool
 
 from chatbot.agent.graph import (
@@ -290,3 +290,32 @@ def test_agent_loop_stops_when_tool_call_limit_is_reached() -> None:
     assert calls == [f"질문 {index}" for index in range(MAX_AGENT_TOOL_CALLS)]
     assert result["tool_call_count"] == MAX_AGENT_TOOL_CALLS
     assert result["messages"][-1].content == AGENT_CALL_LIMIT_MESSAGE
+
+
+def test_agent_loop_streams_model_text_as_custom_events() -> None:
+    """스트리밍 실행은 상태 이벤트와 답변 조각을 custom stream으로 전달"""
+    class StreamingModel:
+        def bind_tools(self, tools, *, strict):
+            return self
+
+        def stream(self, messages):
+            yield AIMessageChunk(content="안녕")
+            yield AIMessageChunk(content="하세요")
+
+    graph = create_agent_loop_graph(model=StreamingModel(), tools=[])
+
+    events = list(
+        graph.stream(
+            {
+                "messages": [HumanMessage(content="안녕하세요.")],
+                "streaming": True,
+            },
+            stream_mode="custom",
+        )
+    )
+
+    assert events == [
+        {"event": "status", "stage": "generate"},
+        {"event": "token", "text": "안녕"},
+        {"event": "token", "text": "하세요"},
+    ]

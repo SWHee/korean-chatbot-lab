@@ -208,9 +208,15 @@ def _agent_execution_details(
     messages: list,
 ) -> tuple[list[AgentToolResult], list[AgentSource], list[DepositProductOption]]:
     """Agent 메시지 누적값을 API용 Tool·근거·상품 목록으로 변환"""
+    latest_human_index = max(
+        index
+        for index, message in enumerate(messages)
+        if isinstance(message, HumanMessage)
+    )
+    current_turn_messages = messages[latest_human_index + 1 :]
     calls_by_id = {
         call["id"]: call
-        for message in messages
+        for message in current_turn_messages
         if isinstance(message, AIMessage)
         for call in message.tool_calls
     }
@@ -218,7 +224,7 @@ def _agent_execution_details(
     sources = []
     products = []
 
-    for message in messages:
+    for message in current_turn_messages:
         if not isinstance(message, ToolMessage):
             continue
         tool_call = calls_by_id.get(message.tool_call_id, {})
@@ -243,6 +249,33 @@ def _agent_execution_details(
         )
 
     return tools, sources, products
+
+
+def _agent_response(
+    *,
+    thread_id: str,
+    graph_result: dict,
+    execution_seconds: float,
+) -> AgentResponse:
+    """완료된 Agent Graph 상태를 API 응답 모델로 변환"""
+    messages = graph_result["messages"]
+    tools, sources, products = _agent_execution_details(messages)
+    return AgentResponse(
+        thread_id=thread_id,
+        answer=str(messages[-1].content),
+        route=graph_result["route"],
+        product_preferences=graph_result.get("product_preferences", {}),
+        missing_fields=graph_result.get("missing_fields", []),
+        tools=tools,
+        sources=sources,
+        products=products,
+        execution_seconds=execution_seconds,
+    )
+
+
+def _sse_event(*, event: str, data: dict) -> str:
+    """SSE event와 JSON data 한 묶음 생성"""
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 @asynccontextmanager
@@ -385,21 +418,68 @@ async def ask_agent(payload: AgentRequest, request: Request) -> AgentResponse:
     started_at = perf_counter()
     graph_result = await asyncio.to_thread(
         request.app.state.agent_graph.invoke,
-        input={"messages": [HumanMessage(content=payload.message)]},
+        input={
+            "messages": [HumanMessage(content=payload.message)],
+            "streaming": False,
+        },
         config={"configurable": {"thread_id": payload.thread_id}},
     )
     execution_seconds = perf_counter() - started_at
-    messages = graph_result["messages"]
-    tools, sources, products = _agent_execution_details(messages)
 
-    return AgentResponse(
+    return _agent_response(
         thread_id=payload.thread_id,
-        answer=str(messages[-1].content),
-        route=graph_result["route"],
-        product_preferences=graph_result.get("product_preferences", {}),
-        missing_fields=graph_result.get("missing_fields", []),
-        tools=tools,
-        sources=sources,
-        products=products,
+        graph_result=graph_result,
         execution_seconds=execution_seconds,
     )
+
+
+@app.post("/ask-agent/stream", response_class=StreamingResponse)
+async def ask_agent_stream(
+    payload: AgentRequest,
+    request: Request,
+) -> StreamingResponse:
+    """Agent 진행 상태·답변 조각·최종 결과를 SSE로 전달"""
+    await asyncio.to_thread(prepare_agent_resources, request.app)
+
+    def stream_events():
+        started_at = perf_counter()
+        graph_result = None
+        try:
+            for mode, chunk in request.app.state.agent_graph.stream(
+                input={
+                    "messages": [HumanMessage(content=payload.message)],
+                    "streaming": True,
+                },
+                config={"configurable": {"thread_id": payload.thread_id}},
+                stream_mode=["custom", "values"],
+            ):
+                if mode == "custom":
+                    event = chunk.get("event", "status")
+                    yield _sse_event(
+                        event=event,
+                        data={
+                            key: value
+                            for key, value in chunk.items()
+                            if key != "event"
+                        },
+                    )
+                elif mode == "values":
+                    graph_result = chunk
+
+            if graph_result is None:
+                raise RuntimeError("agent stream produced no final state")
+            response = _agent_response(
+                thread_id=payload.thread_id,
+                graph_result=graph_result,
+                execution_seconds=perf_counter() - started_at,
+            )
+            yield _sse_event(event="result", data=response.model_dump(mode="json"))
+        except Exception:
+            yield _sse_event(
+                event="error",
+                data={
+                    "message": "Agent 실행 중 오류가 발생했어요. 잠시 후 다시 시도해 주세요."
+                },
+            )
+
+    return StreamingResponse(stream_events(), media_type="text/event-stream")

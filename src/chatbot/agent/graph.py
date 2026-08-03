@@ -7,6 +7,7 @@ from typing import Literal, NotRequired, TypedDict
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
@@ -34,6 +35,7 @@ class AgentState(MessagesState):
 
     tool_call_count: NotRequired[int]
     tool_call_signatures: NotRequired[list[str]]
+    streaming: NotRequired[bool]
 
 
 class MultiTurnAgentState(AgentState):
@@ -61,13 +63,34 @@ def _add_agent_loop_nodes(*, builder, model, tools: list[BaseTool]) -> None:
     """Tool 호출과 최종 답변 반복 Node·Edge 추가"""
     model_with_tools = model.bind_tools(tools, strict=True)
 
-    def agent_model_node(state: AgentState) -> dict:
-        response = model_with_tools.invoke(
-            [
-                SystemMessage(content=TOOL_CALLING_SYSTEM_PROMPT),
-                *state["messages"],
-            ]
+    def stream_model_response(messages: list) -> AIMessage:
+        """ChatModel 조각을 누적하고 텍스트를 custom stream으로 전달"""
+        write_event = get_stream_writer()
+        response_chunk = None
+        for chunk in model_with_tools.stream(messages):
+            response_chunk = chunk if response_chunk is None else response_chunk + chunk
+            if isinstance(chunk.content, str) and chunk.content:
+                write_event({"event": "token", "text": chunk.content})
+        if response_chunk is None:
+            raise ValueError("streaming agent model returned no chunks")
+        return AIMessage(
+            content=response_chunk.content,
+            tool_calls=response_chunk.tool_calls,
+            additional_kwargs=response_chunk.additional_kwargs,
+            response_metadata=response_chunk.response_metadata,
+            id=response_chunk.id,
         )
+
+    def agent_model_node(state: AgentState) -> dict:
+        messages = [
+            SystemMessage(content=TOOL_CALLING_SYSTEM_PROMPT),
+            *state["messages"],
+        ]
+        if state.get("streaming", False):
+            get_stream_writer()({"event": "status", "stage": "generate"})
+            response = stream_model_response(messages)
+        else:
+            response = model_with_tools.invoke(messages)
         if not isinstance(response, AIMessage):
             raise TypeError("agent model must return AIMessage")
         return {"messages": [response]}
@@ -104,6 +127,14 @@ def _add_agent_loop_nodes(*, builder, model, tools: list[BaseTool]) -> None:
             _tool_call_signature(tool_call)
             for tool_call in latest_message.tool_calls
         ]
+        if state.get("streaming", False):
+            get_stream_writer()(
+                {
+                    "event": "status",
+                    "stage": "tools",
+                    "tools": [tool_call["name"] for tool_call in latest_message.tool_calls],
+                }
+            )
         return {
             "tool_call_count": state.get("tool_call_count", 0) + len(signatures),
             "tool_call_signatures": [
@@ -121,6 +152,8 @@ def _add_agent_loop_nodes(*, builder, model, tools: list[BaseTool]) -> None:
             and tool_call_count + len(latest_message.tool_calls) > MAX_AGENT_TOOL_CALLS
             else AGENT_REPEAT_CALL_MESSAGE
         )
+        if state.get("streaming", False):
+            get_stream_writer()({"event": "token", "text": message})
         return {"messages": [AIMessage(content=message)]}
 
     builder.add_node("agent_model", agent_model_node)
@@ -190,6 +223,8 @@ def create_multi_turn_agent_graph(
         if not isinstance(latest_message, HumanMessage):
             raise TypeError("multi-turn graph requires latest HumanMessage")
 
+        if state.get("streaming", False):
+            get_stream_writer()({"event": "status", "stage": "analyze"})
         intent = analyze_turn(
             message=str(latest_message.content),
             previous_preferences=state.get("product_preferences"),
@@ -229,9 +264,16 @@ def create_multi_turn_agent_graph(
         return state["route"]
 
     def ask_clarifying_question_node(state: MultiTurnAgentState) -> dict:
-        return {"messages": [AIMessage(content=state["clarifying_question"])]}
+        question = state["clarifying_question"]
+        if state.get("streaming", False):
+            get_stream_writer()({"event": "status", "stage": "clarify"})
+            get_stream_writer()({"event": "token", "text": question})
+        return {"messages": [AIMessage(content=question)]}
 
     def explain_scope_node(state: MultiTurnAgentState) -> dict:
+        if state.get("streaming", False):
+            get_stream_writer()({"event": "status", "stage": "out_of_scope"})
+            get_stream_writer()({"event": "token", "text": OUT_OF_SCOPE_MESSAGE})
         return {"messages": [AIMessage(content=OUT_OF_SCOPE_MESSAGE)]}
 
     builder = StateGraph(MultiTurnAgentState)

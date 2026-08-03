@@ -137,3 +137,35 @@ def test_clarify_turn_does_not_reuse_another_thread_preferences(tmp_path) -> Non
     assert result["route"] == "clarify"
     assert result["missing_fields"] == ["product_type"]
     assert result["messages"][-1].content == "예금과 적금 중 어떤 상품을 찾으시나요?"
+
+
+def test_clarify_turn_streams_fixed_question_as_token(tmp_path) -> None:
+    """추가 질문도 SSE token으로 전달할 수 있는 Graph custom event 반환"""
+    saver = create_sqlite_checkpointer(database_path=tmp_path / "langgraph.sqlite3")
+    graph = create_multi_turn_agent_graph(
+        model=ScriptedToolCallingModel([]),
+        tools=[],
+        analyze_turn=lambda **kwargs: TurnIntent(intent="product"),
+        checkpointer=saver,
+    )
+
+    events = list(
+        graph.stream(
+            {
+                "messages": [HumanMessage(content="금융상품 추천해 주세요.")],
+                "streaming": True,
+            },
+            config=_thread_config("conversation-stream"),
+            stream_mode="custom",
+        )
+    )
+    saver.conn.close()
+
+    assert events == [
+        {"event": "status", "stage": "analyze"},
+        {"event": "status", "stage": "clarify"},
+        {
+            "event": "token",
+            "text": "예금과 적금 중 어떤 상품을 찾으시나요?",
+        },
+    ]
