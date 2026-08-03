@@ -1,5 +1,8 @@
 import asyncio
+import json
 from types import SimpleNamespace
+
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 import chatbot.main as main_module
 
@@ -364,3 +367,215 @@ def test_ask_workflow_marks_mixed_partial_failure(monkeypatch) -> None:
     assert response.product_status == "error"
     assert response.partial_failure is True
     assert response.products == []
+
+
+def test_prepare_agent_resources_creates_multi_turn_graph(monkeypatch) -> None:
+    """공유 RAG 자원과 SQLite Checkpointer로 Agent Graph 준비"""
+    agent_graph = object()
+    tool_model = object()
+    tools = [object()]
+    turn_analyzer = object()
+    checkpointer = object()
+    app = SimpleNamespace(
+        state=SimpleNamespace(
+            generator=FakeGenerator(),
+            encoder=object(),
+            collection=object(),
+            langfeather_enabled=False,
+        )
+    )
+    captured = {}
+
+    monkeypatch.setattr(main_module, "prepare_rag_resources", lambda app: None)
+    monkeypatch.setattr(main_module, "create_tool_calling_model", lambda: tool_model)
+    monkeypatch.setattr(main_module, "create_agent_tools", lambda **kwargs: tools)
+    monkeypatch.setattr(
+        main_module,
+        "create_turn_analyzer",
+        lambda **kwargs: turn_analyzer,
+    )
+    monkeypatch.setattr(
+        main_module,
+        "create_sqlite_checkpointer",
+        lambda: checkpointer,
+    )
+
+    def fake_create_multi_turn_agent_graph(**kwargs):
+        captured.update(kwargs)
+        return agent_graph
+
+    monkeypatch.setattr(
+        main_module,
+        "create_multi_turn_agent_graph",
+        fake_create_multi_turn_agent_graph,
+    )
+
+    main_module.prepare_agent_resources(app)
+
+    assert app.state.agent_graph is agent_graph
+    assert app.state.agent_checkpointer is checkpointer
+    assert captured == {
+        "model": tool_model,
+        "tools": tools,
+        "analyze_turn": turn_analyzer,
+        "checkpointer": checkpointer,
+    }
+
+
+def test_ask_agent_route_exists() -> None:
+    """Swagger에 멀티턴 Agent endpoint 노출"""
+    assert "/ask-agent" in main_module.app.openapi()["paths"]
+
+
+def test_ask_agent_returns_thread_tools_sources_and_products(monkeypatch) -> None:
+    """Agent Graph 상태를 API 응답 계약으로 변환"""
+    times = iter([10.0, 12.0])
+
+    class FakeAgentGraph:
+        def invoke(self, *, input: dict, config: dict) -> dict:
+            assert input == {
+                "messages": [
+                    HumanMessage(content="12개월 정기예금과 예금자보호를 알려주세요.")
+                ]
+            }
+            assert config == {"configurable": {"thread_id": "thread-1"}}
+            return {
+                "route": "ready",
+                "product_preferences": {
+                    "product_type": "deposit",
+                    "term_months": 12,
+                    "sort_by": "base_interest_rate",
+                    "limit": 3,
+                },
+                "missing_fields": [],
+                "messages": [
+                    input["messages"][0],
+                    AIMessage(
+                        content="",
+                        tool_calls=[
+                            {
+                                "name": "search_law_articles",
+                                "args": {"question": "예금자보호"},
+                                "id": "law-1",
+                                "type": "tool_call",
+                            },
+                            {
+                                "name": "search_financial_products",
+                                "args": {
+                                    "product_type": "deposit",
+                                    "term_months": 12,
+                                    "sort_by": "base_interest_rate",
+                                    "limit": 3,
+                                },
+                                "id": "product-1",
+                                "type": "tool_call",
+                            },
+                        ],
+                    ),
+                    ToolMessage(
+                        content=json.dumps(
+                            {
+                                "status": "ok",
+                                "articles": [
+                                    {
+                                        "source_id": "S1",
+                                        "law_name": "예금자보호법",
+                                        "article_no": "제32조",
+                                        "effective_date": "20260102",
+                                        "text": "보험금 기준",
+                                    }
+                                ],
+                            }
+                        ),
+                        tool_call_id="law-1",
+                        name="search_law_articles",
+                    ),
+                    ToolMessage(
+                        content=json.dumps(
+                            {
+                                "status": "ok",
+                                "products": [
+                                    {
+                                        "disclosure_month": "202608",
+                                        "company_code": "001",
+                                        "product_code": "DEP-001",
+                                        "company_name": "테스트은행",
+                                        "product_name": "테스트예금",
+                                        "term_months": 12,
+                                        "base_interest_rate": 3.1,
+                                        "max_interest_rate": 3.5,
+                                    }
+                                ],
+                            }
+                        ),
+                        tool_call_id="product-1",
+                        name="search_financial_products",
+                    ),
+                    AIMessage(content="법령과 상품 후보를 함께 확인했어요."),
+                ],
+            }
+
+    request = create_rag_request()
+    request.app.state.agent_graph = FakeAgentGraph()
+    monkeypatch.setattr(main_module, "perf_counter", lambda: next(times))
+
+    response = asyncio.run(
+        main_module.ask_agent(
+            main_module.AgentRequest(
+                thread_id="thread-1",
+                message="12개월 정기예금과 예금자보호를 알려주세요.",
+            ),
+            request,
+        )
+    )
+
+    assert response.thread_id == "thread-1"
+    assert response.answer == "법령과 상품 후보를 함께 확인했어요."
+    assert response.route == "ready"
+    assert response.product_preferences["term_months"] == 12
+    assert [tool.name for tool in response.tools] == [
+        "search_law_articles",
+        "search_financial_products",
+    ]
+    assert response.tools[0].status == "ok"
+    assert response.sources[0].article_no == "제32조"
+    assert response.products[0].product_name == "테스트예금"
+    assert response.execution_seconds == 2.0
+
+
+def test_ask_agent_returns_clarifying_question_without_tools() -> None:
+    """조건이 부족한 첫 턴은 Tool 없이 다음 질문을 반환"""
+    class FakeAgentGraph:
+        def invoke(self, *, input: dict, config: dict) -> dict:
+            return {
+                "route": "clarify",
+                "product_preferences": {
+                    "product_type": None,
+                    "term_months": None,
+                    "sort_by": "base_interest_rate",
+                    "limit": 3,
+                },
+                "missing_fields": ["product_type", "term_months"],
+                "messages": [
+                    input["messages"][0],
+                    AIMessage(content="예금과 적금 중 어떤 상품을 찾으시나요?"),
+                ],
+            }
+
+    request = create_rag_request()
+    request.app.state.agent_graph = FakeAgentGraph()
+
+    response = asyncio.run(
+        main_module.ask_agent(
+            main_module.AgentRequest(
+                thread_id="thread-clarify",
+                message="금융상품 추천해 주세요.",
+            ),
+            request,
+        )
+    )
+
+    assert response.route == "clarify"
+    assert response.tools == []
+    assert response.missing_fields == ["product_type", "term_months"]
+    assert "예금과 적금" in response.answer

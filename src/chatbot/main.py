@@ -1,6 +1,7 @@
 """FastAPI 챗봇 API와 생성 backend 수명주기"""
 
 import asyncio
+import json
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -8,8 +9,14 @@ from time import perf_counter
 
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from pydantic import BaseModel, Field
 
+from chatbot.agent.checkpoint import create_sqlite_checkpointer
+from chatbot.agent.graph import create_multi_turn_agent_graph
+from chatbot.agent.model import create_tool_calling_model
+from chatbot.agent.tools import create_agent_tools
+from chatbot.agent.turn_analysis import create_turn_analyzer
 from chatbot.embedding import load_encoder
 from chatbot.finlife import DepositProductOption
 from chatbot.generator_backend import create_generator
@@ -26,6 +33,7 @@ from chatbot.vectorstore import open_collection
 
 LANGFEATHER_TRACE_NAME = "korean-chatbot-rag"
 LANGFEATHER_WORKFLOW_TRACE_NAME = "korean-chatbot-routed-workflow"
+LANGFEATHER_AGENT_TRACE_NAME = "korean-chatbot-agent"
 LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS = 2.0
 
 
@@ -82,6 +90,44 @@ class WorkflowResponse(BaseModel):
     execution_seconds: float
 
 
+class AgentRequest(BaseModel):
+    """멀티턴 Agent에 전달할 thread와 현재 사용자 메시지"""
+
+    thread_id: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+
+
+class AgentSource(BaseModel):
+    """Agent 법령 Tool이 반환한 인용 근거"""
+
+    source_id: str
+    law_name: str
+    article_no: str
+    effective_date: str
+
+
+class AgentToolResult(BaseModel):
+    """한 번의 Agent Tool 호출과 결과 상태"""
+
+    name: str
+    arguments: dict[str, object]
+    status: str | None = None
+
+
+class AgentResponse(BaseModel):
+    """멀티턴 Agent의 답변과 실행 요약"""
+
+    thread_id: str
+    answer: str
+    route: str
+    product_preferences: dict[str, object] = Field(default_factory=dict)
+    missing_fields: list[str] = Field(default_factory=list)
+    tools: list[AgentToolResult]
+    sources: list[AgentSource]
+    products: list[DepositProductOption]
+    execution_seconds: float
+
+
 def prepare_rag_resources(app: FastAPI) -> None:
     """필요 시 RAG 임베딩 모델과 벡터스토어 준비"""
     if not hasattr(app.state, "encoder"):
@@ -132,6 +178,73 @@ def prepare_workflow_resources(app: FastAPI) -> None:
     app.state.routed_workflow_graph = workflow_graph
 
 
+def prepare_agent_resources(app: FastAPI) -> None:
+    """공유 자원과 SQLite Checkpointer로 멀티턴 Agent Graph 준비"""
+    if hasattr(app.state, "agent_graph"):
+        return
+
+    prepare_rag_resources(app)
+    agent_checkpointer = create_sqlite_checkpointer()
+    agent_graph = create_multi_turn_agent_graph(
+        model=create_tool_calling_model(),
+        tools=create_agent_tools(
+            encoder=app.state.encoder,
+            collection=app.state.collection,
+            top_k=DEFAULT_TOP_K,
+        ),
+        analyze_turn=create_turn_analyzer(generator=app.state.generator),
+        checkpointer=agent_checkpointer,
+    )
+    if app.state.langfeather_enabled:
+        agent_graph = app.state.langfeather_sdk.wrap_runnable(
+            agent_graph,
+            name=LANGFEATHER_AGENT_TRACE_NAME,
+        )
+    app.state.agent_checkpointer = agent_checkpointer
+    app.state.agent_graph = agent_graph
+
+
+def _agent_execution_details(
+    messages: list,
+) -> tuple[list[AgentToolResult], list[AgentSource], list[DepositProductOption]]:
+    """Agent 메시지 누적값을 API용 Tool·근거·상품 목록으로 변환"""
+    calls_by_id = {
+        call["id"]: call
+        for message in messages
+        if isinstance(message, AIMessage)
+        for call in message.tool_calls
+    }
+    tools = []
+    sources = []
+    products = []
+
+    for message in messages:
+        if not isinstance(message, ToolMessage):
+            continue
+        tool_call = calls_by_id.get(message.tool_call_id, {})
+        try:
+            result = json.loads(message.content)
+        except (TypeError, json.JSONDecodeError):
+            result = {}
+        tools.append(
+            AgentToolResult(
+                name=message.name or tool_call.get("name", "unknown"),
+                arguments=tool_call.get("args", {}),
+                status=result.get("status"),
+            )
+        )
+        sources.extend(
+            AgentSource.model_validate(article)
+            for article in result.get("articles", [])
+        )
+        products.extend(
+            DepositProductOption.model_validate(product)
+            for product in result.get("products", [])
+        )
+
+    return tools, sources, products
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """서버 시작 시 선택한 backend의 생성기를 준비하고 종료 시 해제"""
@@ -146,12 +259,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 langfeather_sdk.shutdown,
                 timeout=LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS,
             )
+        agent_checkpointer = getattr(app.state, "agent_checkpointer", None)
+        if agent_checkpointer:
+            agent_checkpointer.conn.close()
         for name in (
             "generator",
             "encoder",
             "collection",
             "rag_graph",
             "routed_workflow_graph",
+            "agent_graph",
+            "agent_checkpointer",
             "langfeather_enabled",
             "langfeather_sdk",
         ):
@@ -255,5 +373,33 @@ async def ask_workflow(
         ],
         products=graph_result.get("products", []),
         partial_failure=partial_failure,
+        execution_seconds=execution_seconds,
+    )
+
+
+@app.post("/ask-agent", response_model=AgentResponse)
+async def ask_agent(payload: AgentRequest, request: Request) -> AgentResponse:
+    """같은 thread의 조건을 이어가는 비스트리밍 Agent 실행"""
+    await asyncio.to_thread(prepare_agent_resources, request.app)
+
+    started_at = perf_counter()
+    graph_result = await asyncio.to_thread(
+        request.app.state.agent_graph.invoke,
+        input={"messages": [HumanMessage(content=payload.message)]},
+        config={"configurable": {"thread_id": payload.thread_id}},
+    )
+    execution_seconds = perf_counter() - started_at
+    messages = graph_result["messages"]
+    tools, sources, products = _agent_execution_details(messages)
+
+    return AgentResponse(
+        thread_id=payload.thread_id,
+        answer=str(messages[-1].content),
+        route=graph_result["route"],
+        product_preferences=graph_result.get("product_preferences", {}),
+        missing_fields=graph_result.get("missing_fields", []),
+        tools=tools,
+        sources=sources,
+        products=products,
         execution_seconds=execution_seconds,
     )

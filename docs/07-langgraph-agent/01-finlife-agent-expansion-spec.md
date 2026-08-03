@@ -2,8 +2,8 @@
 
 - 최초 작성: 2026-07-24
 - 최근 재정리: 2026-07-30
-- 상태: 15단계 Dataset·fixture 계약 완료, evaluator 구현 전
-- 현재 기준선: SQLite 멀티턴 조건 병합 기반 ToolNode Agent loop와 Agent 개발 Dataset
+- 상태: 16단계 비스트리밍 Agent API 완료, 15단계 evaluator 구현·17단계 시작 전
+- 현재 기준선: SQLite 멀티턴 조건 병합 기반 Agent API와 Agent 개발 Dataset
 
 ## 문서 역할
 
@@ -448,10 +448,15 @@ Tool·인자·상품 값은 코드로 평가하고, 문장 도움 정도만 Judg
 
 ### 16. Agent v1 비스트리밍 API
 
+- 상태: 완료 (2026-08-03)
 - 목표: 평가된 Agent Graph를 기존 RAG endpoint와 분리해 연결
 - 요청: `thread_id`, 현재 사용자 메시지
 - 응답: thread, 대화 상태, 최종·추가 질문, 사용 Tool, 출처, 종료·오류 정보
 - 검증: 첫 질문과 같은 thread의 후속 답변, 새 thread 격리
+- 적용: `/ask-agent`, `prepare_agent_resources()`, LangFeather Agent trace 이름
+- 결과: Tool 결과를 `tools`, `sources`, `products`로 분리하고 `route`,
+  `missing_fields`, `product_preferences`를 함께 반환
+- API 단위 검증: 혼합 Tool 결과 응답과 Tool 없는 clarify 응답 확인
 - 유지: 기존 RAG와 Routed Workflow endpoint
 - 제외: 기존 endpoint 교체, 스트리밍, SQLite 관리 UI
 
