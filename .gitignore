@@ -10,3 +10,6 @@
 
 # Local Graphify output
 /graphify-out/
+
+# Local LangGraph checkpoints
+/.runtime/

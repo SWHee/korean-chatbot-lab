@@ -12,6 +12,7 @@ dependencies = [
     "langchain-core>=1.4.8",
     "langchain-text-splitters>=1.1.2",
     "langgraph>=1.2.9",
+    "langgraph-checkpoint-sqlite>=3.1.1",
     "python-dotenv>=1.2.1",
     "sentence-transformers>=5.6.0",
     "torch>=2.12.1,<2.13",

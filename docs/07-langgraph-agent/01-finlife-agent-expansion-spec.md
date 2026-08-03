@@ -2,8 +2,8 @@
 
 - 최초 작성: 2026-07-24
 - 최근 재정리: 2026-07-30
-- 상태: 11단계 Claude Tool call 단독 확인 완료, 12단계 시작 전
-- 현재 기준선: Git `df643fb`의 Routed Workflow API와 작업 트리의 Tool Calling POC
+- 상태: 13단계 SQLite Checkpointer POC 완료, 14단계 시작 전
+- 현재 기준선: SQLite 단기 기억 기반 ToolNode Agent loop와 Routed Workflow v1
 
 ## 문서 역할
 
@@ -378,11 +378,18 @@ Ollama Tool Calling은 오픈웨이트 LoRA·vLLM 실습 결과를 다시 연결
 
 ### 12. 두 Tool의 단일 요청 Agent loop
 
+- 상태: 완료 (2026-08-03)
 - Tool: `search_law_articles`, `search_financial_products`
 - 상태: `MessagesState`
 - 그래프: `agent_model ↔ ToolNode`, Tool 호출이 없으면 종료
 - 안전장치: 이름 있는 실행 상한, 동일 Tool·인자 반복 감지
 - 검증: 법령만, 상품만, 두 Tool, Tool 불필요, Tool 오류
+- 결과: Tool 결과를 `ToolMessage`로 누적한 뒤 Claude가 최종 답변을 생성
+- 적용: `agent/tools.py`의 실행 Tool과 `agent/graph.py`의 `AgentState`, Guard Node,
+  `ToolNode` 추가
+- 실행 상한: `MAX_AGENT_TOOL_CALLS = 4`, 같은 Tool·인자 재요청은 고정 안내로 종료
+- 실제 확인: 법령 질문에서 Claude가 법령 Tool을 두 번 호출한 뒤 최종 답변 반환
+- 현재 범위: 정기예금, 단일 요청, Graph 직접 실행
 - 제외: Checkpointer, 이전 요청 기억, FastAPI
 
 Agent Tool은 생성된 답변이 아니라 검색 조문과 정규화 상품을 반환한다. 최종 설명은
@@ -390,11 +397,13 @@ Agent Tool은 생성된 답변이 아니라 검색 조문과 정규화 상품을
 
 ### 13. SQLite Checkpointer POC
 
+- 상태: 완료 (2026-08-03)
 - 목표: 같은 thread 상태를 서버 메모리가 아닌 SQLite에 저장·복원
-- 의존성: 필요 시 `langgraph-checkpoint-sqlite` 추가
+- 적용: `langgraph-checkpoint-sqlite`, `agent/checkpoint.py`, Graph compile의
+  선택적 `checkpointer`
 - 저장 위치: 저장소에서 제외할 `/.runtime/langgraph.sqlite3`
 - 설정: `thread_id`는 runtime config로 전달
-- 검증: 같은 thread 복원, 다른 thread 격리, DB 연결 재생성 후 복원
+- 검증: 같은 thread 복원, 다른 thread 격리, DB 연결 재생성 후 복원 완료
 - 보안: 메시지·상품 조건만 저장하고 API 키와 backend 객체 제외
 - 제외: 상품 추가 질문, FastAPI, UI, Time Travel 화면
 
