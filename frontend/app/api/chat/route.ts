@@ -1,11 +1,12 @@
 const DEFAULT_API_URL = "http://127.0.0.1:8000";
-const RAG_STREAM_PATH = "/ask-rag/stream";
+const AGENT_STREAM_PATH = "/ask-agent/stream";
 
 export async function POST(request: Request) {
   let question: unknown;
+  let threadId: unknown;
 
   try {
-    ({ question } = await request.json());
+    ({ question, threadId } = await request.json());
   } catch {
     return new Response("질문 형식을 확인해 주세요.", { status: 400 });
   }
@@ -14,13 +15,17 @@ export async function POST(request: Request) {
     return new Response("질문을 입력해 주세요.", { status: 400 });
   }
 
+  if (typeof threadId !== "string" || !threadId.trim()) {
+    return new Response("새 대화를 시작한 뒤 다시 시도해 주세요.", { status: 400 });
+  }
+
   const apiUrl = process.env.CHATBOT_API_URL ?? DEFAULT_API_URL;
 
   try {
-    const response = await fetch(`${apiUrl.replace(/\/$/, "")}${RAG_STREAM_PATH}`, {
+    const response = await fetch(`${apiUrl.replace(/\/$/, "")}${AGENT_STREAM_PATH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question: question.trim() }),
+      body: JSON.stringify({ thread_id: threadId, message: question.trim() }),
       cache: "no-store",
     });
 
@@ -36,13 +41,13 @@ export async function POST(request: Request) {
 
     return new Response(response.body, {
       headers: {
-        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache",
       },
     });
   } catch {
     return new Response(
-      "FastAPI에 연결하지 못했습니다. FastAPI와 Ollama 실행 상태를 확인해 주세요.",
+      "FastAPI에 연결하지 못했습니다. FastAPI 실행 상태를 확인해 주세요.",
       { status: 502 },
     );
   }

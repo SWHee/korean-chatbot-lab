@@ -2,7 +2,7 @@
 
 - 최초 작성: 2026-07-24
 - 최근 재정리: 2026-07-30
-- 상태: 17단계 Agent SSE API 완료, 15단계 evaluator 구현·18단계 시작 전
+- 상태: 18단계 멀티턴 Agent UI 완료, 15단계 evaluator 구현·검증 대기
 - 현재 기준선: SQLite 멀티턴 조건 병합 기반 Agent API와 Agent 개발 Dataset
 
 ## 문서 역할
@@ -479,11 +479,18 @@ Agent가 느리거나 Tool 선택이 불안정하면 Routed Workflow v1을 기�
 
 ### 18. Next.js 멀티턴 Agent UI
 
+- 상태: 완료 (2026-08-03)
 - 목표: 같은 thread의 추가 질문과 Tool 진행 상태를 사용자에게 표시
 - thread: 새 대화에서 ID 생성, 후속 메시지에서 재사용
 - UI: 추가 질문, 비교 기준, 상품 후보, 법령 출처, 진행 상태 구분
 - 검증: 모호한 질문부터 두 턴 이상 진행해 후보 확인, 새 대화 격리
 - 제외: Time Travel UI, 장기 사용자 프로필, 가입·결제 동작
+- 적용: `/api/chat`이 `/ask-agent/stream`을 프록시하고, 브라우저가 SSE의
+  `status`·`token` 이벤트를 읽어 진행 상태와 답변을 갱신
+- 결과: 같은 페이지에서는 생성한 `thread_id`를 재사용하고, `새 대화 시작`은 새
+  thread와 빈 대화 기록으로 전환
+- 검증: 모호한 상품 질문 → 추가 질문 → 조건 보완 질문의 두 턴 흐름과 Claude
+  콘텐츠 블록의 token·result 전달 확인
 
 ## 이번 범위의 LangGraph 개념
 
