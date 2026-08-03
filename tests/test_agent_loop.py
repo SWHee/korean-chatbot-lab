@@ -300,7 +300,9 @@ def test_agent_loop_streams_model_text_as_custom_events() -> None:
 
         def stream(self, messages):
             yield AIMessageChunk(content="안녕")
-            yield AIMessageChunk(content="하세요")
+            yield AIMessageChunk(
+                content=[{"text": "하세요", "type": "text", "index": 0}]
+            )
 
     graph = create_agent_loop_graph(model=StreamingModel(), tools=[])
 

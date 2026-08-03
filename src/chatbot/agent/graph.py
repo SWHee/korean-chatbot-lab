@@ -69,8 +69,8 @@ def _add_agent_loop_nodes(*, builder, model, tools: list[BaseTool]) -> None:
         response_chunk = None
         for chunk in model_with_tools.stream(messages):
             response_chunk = chunk if response_chunk is None else response_chunk + chunk
-            if isinstance(chunk.content, str) and chunk.content:
-                write_event({"event": "token", "text": chunk.content})
+            if chunk.text:
+                write_event({"event": "token", "text": chunk.text})
         if response_chunk is None:
             raise ValueError("streaming agent model returned no chunks")
         return AIMessage(

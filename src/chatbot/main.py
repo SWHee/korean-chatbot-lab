@@ -262,7 +262,7 @@ def _agent_response(
     tools, sources, products = _agent_execution_details(messages)
     return AgentResponse(
         thread_id=thread_id,
-        answer=str(messages[-1].content),
+        answer=messages[-1].text,
         route=graph_result["route"],
         product_preferences=graph_result.get("product_preferences", {}),
         missing_fields=graph_result.get("missing_fields", []),

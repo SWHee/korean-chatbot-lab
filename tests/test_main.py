@@ -601,7 +601,11 @@ def test_ask_agent_stream_returns_status_token_and_result_events() -> None:
                 "missing_fields": [],
                 "messages": [
                     input["messages"][0],
-                    AIMessage(content="안녕하세요"),
+                    AIMessage(
+                        content=[
+                            {"text": "안녕하세요", "type": "text", "index": 0}
+                        ]
+                    ),
                 ],
             }
 
@@ -623,3 +627,4 @@ def test_ask_agent_stream_returns_status_token_and_result_events() -> None:
     assert 'event: status\ndata: {"stage": "analyze"}' in body
     assert 'event: token\ndata: {"text": "안녕"}' in body
     assert 'event: result\ndata: {"thread_id": "thread-stream"' in body
+    assert '"answer": "안녕하세요"' in body
