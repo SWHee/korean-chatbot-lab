@@ -317,7 +317,7 @@ korean-chatbot/
 ```
 
 초기 from-scratch Transformer 코드는 현재 주력 경로와 분리해
-[experiments/from_scratch](experiments/from_scratch/README.md)에 보존합니다.
+[experiments/from_scratch](experiments/from_scratch/README.md)에 보존되어 있습니다.
 
 ## 주요 문서
 
