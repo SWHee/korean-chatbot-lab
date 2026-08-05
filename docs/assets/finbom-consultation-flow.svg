@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 620" role="img" aria-labelledby="title desc">
+  <title id="title">Finbom consultation flow</title>
+  <desc id="desc">A user question moves through the Next.js chat, FastAPI, and the LangGraph agent. The agent retrieves Korean law and Finlife disclosure data, then streams an answer with its sources.</desc>
+
+  <defs>
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M64 0H0V64" fill="none" stroke="#8BB8E8" stroke-opacity=".045"/>
+    </pattern>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#173253"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#020713" flood-opacity=".38"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0 0L12 6L0 12Z" fill="#77A9D8"/>
+    </marker>
+    <style>
+      .sans { font-family: Inter, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif; }
+      .eyebrow { fill:#79E2D0; font-size:14px; font-weight:800; letter-spacing:2.2px; }
+      .title { fill:#F6F9FC; font-size:42px; font-weight:760; letter-spacing:-1px; }
+      .subtitle { fill:#9EB3C9; font-size:18px; font-weight:520; }
+      .step { fill:#89BDF0; font-size:12px; font-weight:800; letter-spacing:1.6px; }
+      .card-title { fill:#F6F9FC; font-size:21px; font-weight:740; }
+      .card-copy { fill:#9EB3C9; font-size:14px; font-weight:520; }
+      .chip { fill:#D8E6F4; font-size:12px; font-weight:650; }
+      .note { fill:#8EA5BC; font-size:13px; font-weight:520; }
+      .card { fill:#111C2F; stroke:#36506E; stroke-width:1.4; }
+      .card-accent { fill:#173253; stroke:#78ACDB; stroke-width:1.8; }
+      .flow { fill:none; stroke:#77A9D8; stroke-width:2.4; marker-end:url(#arrow); }
+      .state { fill:none; stroke:#79E2D0; stroke-width:1.6; stroke-dasharray:7 7; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="620" rx="32" fill="#0B1220"/>
+  <rect width="1600" height="620" rx="32" fill="url(#grid)"/>
+  <ellipse cx="1310" cy="110" rx="330" ry="220" fill="url(#glow)" opacity=".72"/>
+
+  <g class="sans">
+    <text x="70" y="68" class="eyebrow">FINBOM · EVIDENCE-FIRST CONSULTATION</text>
+    <text x="70" y="122" class="title">From a financial question to a sourced answer</text>
+    <text x="70" y="158" class="subtitle">The interface, agent, and evidence tools stay separate so each result can be inspected.</text>
+
+    <g filter="url(#shadow)">
+      <rect x="60" y="230" width="200" height="176" rx="20" class="card"/>
+      <rect x="320" y="230" width="200" height="176" rx="20" class="card"/>
+      <rect x="580" y="230" width="200" height="176" rx="20" class="card"/>
+      <rect x="840" y="230" width="200" height="176" rx="20" class="card-accent"/>
+      <rect x="1100" y="230" width="200" height="176" rx="20" class="card"/>
+      <rect x="1360" y="230" width="180" height="176" rx="20" class="card-accent"/>
+    </g>
+
+    <text x="84" y="266" class="step">01 · ASK</text>
+    <text x="84" y="311" class="card-title">User question</text>
+    <text x="84" y="343" class="card-copy">Law, protection,</text>
+    <text x="84" y="367" class="card-copy">or deposit terms</text>
+
+    <text x="344" y="266" class="step">02 · CHAT</text>
+    <text x="344" y="311" class="card-title">Next.js UI</text>
+    <text x="344" y="343" class="card-copy">Conversation and</text>
+    <text x="344" y="367" class="card-copy">evidence workspace</text>
+
+    <text x="604" y="266" class="step">03 · STREAM</text>
+    <text x="604" y="311" class="card-title">FastAPI</text>
+    <text x="604" y="343" class="card-copy">Agent request and</text>
+    <text x="604" y="367" class="card-copy">SSE response</text>
+
+    <text x="864" y="266" class="step">04 · DECIDE</text>
+    <text x="864" y="311" class="card-title">LangGraph Agent</text>
+    <text x="864" y="343" class="card-copy">Clarify, guide scope,</text>
+    <text x="864" y="367" class="card-copy">or select a tool</text>
+
+    <text x="1124" y="266" class="step">05 · RETRIEVE</text>
+    <text x="1124" y="311" class="card-title">Evidence tools</text>
+    <rect x="1124" y="331" width="152" height="28" rx="14" fill="#1B2A40"/>
+    <text x="1200" y="350" text-anchor="middle" class="chip">Korean law</text>
+    <rect x="1124" y="367" width="152" height="28" rx="14" fill="#1B2A40"/>
+    <text x="1200" y="386" text-anchor="middle" class="chip">Finlife disclosure</text>
+
+    <text x="1384" y="266" class="step">06 · ANSWER</text>
+    <text x="1384" y="311" class="card-title">Answer</text>
+    <text x="1384" y="343" class="card-copy">Explanation, law,</text>
+    <text x="1384" y="367" class="card-copy">and product data</text>
+
+    <path d="M260 318H306" class="flow"/>
+    <path d="M520 318H566" class="flow"/>
+    <path d="M780 318H826" class="flow"/>
+    <path d="M1040 318H1086" class="flow"/>
+    <path d="M1300 318H1346" class="flow"/>
+
+    <rect x="840" y="458" width="460" height="78" rx="18" fill="#0E1A2B" stroke="#2A695F"/>
+    <text x="866" y="489" class="step" fill="#79E2D0">MULTI-TURN STATE</text>
+    <text x="866" y="516" class="note">SQLite restores messages and confirmed product conditions for the same thread.</text>
+    <path d="M940 406V458" class="state"/>
+    <path d="M1200 406V458" class="state"/>
+  </g>
+</svg>

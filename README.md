@@ -9,7 +9,7 @@
 <h1 align="center">Finbom</h1>
 
 <p align="center">
-  한국 금융 법령과 상품 정보를 근거와 함께 안내하는 멀티턴 금융 상담 Agent
+  한국 금융 법령과 금융상품 공시를 근거로 답하는 멀티턴 금융 상담 에이전트
 </p>
 
 <p align="center">
@@ -18,128 +18,100 @@
 
 <p align="center">
   <a href="https://www.python.org/">
-    <img alt="Python 3.13" src="https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white">
+    <img alt="Python 3.13" src="https://img.shields.io/badge/Python-3.13-5D8BB7?style=flat-square&labelColor=0B1220&logo=python&logoColor=white">
   </a>
   <a href="https://fastapi.tiangolo.com/">
-    <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.138+-009688?style=flat-square&logo=fastapi&logoColor=white">
+    <img alt="FastAPI 0.138+" src="https://img.shields.io/badge/FastAPI-0.138+-5D8BB7?style=flat-square&labelColor=0B1220&logo=fastapi&logoColor=white">
   </a>
-  <a href="https://docs.langchain.com/oss/python/langgraph/">
-    <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-1.2+-1C3C3C?style=flat-square">
+  <a href="https://docs.langchain.com/oss/python/langchain/overview">
+    <img alt="LangChain Core 1.4+" src="https://img.shields.io/badge/LangChain_Core-1.4+-5D8BB7?style=flat-square&labelColor=0B1220">
+  </a>
+  <a href="https://docs.langchain.com/oss/python/langgraph/overview">
+    <img alt="LangGraph 1.2+" src="https://img.shields.io/badge/LangGraph-1.2+-5D8BB7?style=flat-square&labelColor=0B1220">
+  </a>
+  <a href="https://www.anthropic.com/claude">
+    <img alt="Claude API" src="https://img.shields.io/badge/Claude-API-5D8BB7?style=flat-square&labelColor=0B1220&logo=anthropic&logoColor=white">
   </a>
   <a href="https://nextjs.org/">
-    <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white">
+    <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-5D8BB7?style=flat-square&labelColor=0B1220&logo=next.js&logoColor=white">
   </a>
 </p>
 
 <p align="center">
-  <a href="#근거까지-확인하는-금융-상담">프로젝트 소개</a> ·
-  <a href="#핀봄이-할-수-있는-일">주요 기능</a> ·
-  <a href="#질문에서-답변까지">Agent 흐름</a> ·
-  <a href="#법령-데이터와-검색-근거">데이터</a> ·
-  <a href="#빠르게-시작하기">실행 방법</a> ·
+  <a href="#근거를-먼저-보여주는-금융-상담">소개</a> ·
+  <a href="#현재-지원하는-상담">지원 기능</a> ·
+  <a href="#상담-처리-흐름">처리 흐름</a> ·
+  <a href="#실행하기">실행</a> ·
+  <a href="#데이터-출처와-검색-근거">데이터</a> ·
   <a href="docs/README.md">개발 문서</a>
 </p>
 
 ---
 
-## 근거까지 확인하는 금융 상담
+## 근거를 먼저 보여주는 금융 상담
 
-금융 질문은 답을 얻는 것만큼 **어떤 자료를 근거로 답했는지 확인하는 과정**이
-중요합니다. 핀봄은 예금자보호와 금융소비자 권리에 관한 법령을 검색하고, Finlife
-공시에서 은행권 정기예금 후보를 비교해 답변과 근거를 함께 보여 줍니다.
+금융 질문은 답의 내용뿐 아니라 **어떤 자료를 근거로 삼았는지 확인하는 과정**이
+중요합니다. 핀봄은 예금자보호와 금융소비자 권리에 관한 법령을 검색하고, 금융감독원
+Finlife 공시에서 은행권 정기예금 후보를 비교해 답변과 근거를 함께 보여 줍니다.
 
-상담 마스코트 **포키(Poki)** 는 개발 도구에 익숙하지 않은 사용자도 법령 조문과
-상품 비교 결과를 한 흐름에서 읽을 수 있도록 안내합니다.
+상담 마스코트 **포키(Poki)** 는 법령 조문, 상품 비교 결과와 답변을 한 화면에서 읽을
+수 있도록 안내합니다.
 
-## 핀봄이 할 수 있는 일
+> [!IMPORTANT]
+> 핀봄이 표시하는 법령·금융상품 공시 출처와 답변은 참고용이며 법적 효력이나
+> 법률·금융 자문을 제공하지 않습니다.
 
-- **법령 근거 안내** — 예금자보호·금융소비자 권리 질문에 관련 법령명, 조문과 시행일을
-  함께 제시합니다.
-- **정기예금 후보 비교** — 가입 기간과 기본금리·최고금리 기준에 따라 Finlife 공시
-  상품을 정렬해 보여 줍니다.
-- **멀티턴 조건 확인** — 상품 종류나 가입 기간이 부족하면 한 번에 하나씩 되묻고, 같은
-  상담의 확정 조건을 SQLite checkpoint에 이어서 저장합니다.
-- **법령·상품 혼합 상담** — 한 질문에 법령 근거와 상품 비교가 모두 필요하면 Agent가
-  두 Tool을 선택해 결과를 함께 설명합니다.
-- **지원 범위 안내** — 현재 다루지 않는 질문은 관련 없는 답을 만들지 않고
-  `out_of_scope` 경로에서 상담 범위를 안내합니다.
-- **근거 중심 상담 화면** — 스트리밍 답변과 처리 상태를 보여 주고, 답변·법령 근거·상품
-  정보를 분리해 확인할 수 있습니다.
+## 현재 지원하는 상담
 
-## 질문에서 답변까지
+- **법령 근거 확인** — 예금자보호와 금융소비자 권리에 관한 법령명, 조문과 시행일을
+  답변 근거로 제시합니다.
+- **정기예금 후보 비교** — 가입 기간과 기본금리·최고금리 기준에 따라 Finlife 은행권
+  공시 상품을 정렬합니다.
+- **대화로 조건 보완** — 상품 종류나 가입 기간이 부족하면 필요한 조건을 하나씩 묻고,
+  같은 상담에서 확인된 조건을 이어서 사용합니다.
+- **법령과 상품을 함께 조회** — 한 질문에 두 종류의 정보가 필요하면 관련 법령과 상품
+  공시를 모두 확인합니다.
+- **답변과 근거 분리 표시** — 답변을 스트리밍하고, 사용한 법령과 금융상품 정보를 별도
+  영역에서 확인할 수 있습니다.
 
-```mermaid
-flowchart TB
-    U([사용자 질문]) --> UI[Next.js 상담 화면]
-    UI --> API[FastAPI Agent API]
+## 상담 처리 흐름
 
-    subgraph AGENT[LangGraph 멀티턴 Agent]
-        direction TB
-        TURN{현재 턴 분석}
-        TURN -->|clarify| CLARIFY[부족한 조건 질문]
-        TURN -->|out_of_scope| SCOPE[지원 범위 안내]
-        TURN -->|ready| MODEL[Claude Tool-calling Model]
-        MODEL <-->|법령 근거| LAW[[법령 검색 Tool]]
-        MODEL <-->|정기예금 공시| PRODUCT[[Finlife 상품 Tool]]
-        MEMORY[(SQLite checkpoint)] <--> TURN
-    end
+![사용자 질문이 Next.js, FastAPI와 LangGraph 에이전트를 거쳐 법령·금융상품 근거가 포함된 답변으로 이어지는 흐름](docs/assets/finbom-consultation-flow.svg)
 
-    API --> TURN
-    CLARIFY --> RESULT[답변 · 근거 · 상품 정보]
-    SCOPE --> RESULT
-    MODEL -->|Tool 호출 종료| RESULT
-    RESULT --> UI
+핀봄은 먼저 현재 질문과 이전 상담 조건을 분석합니다. 정보가 부족하면 추가 조건을
+묻고, 지원하지 않는 질문에는 상담 범위를 안내합니다. 답변할 준비가 된 질문은 Claude가
+법령 검색과 금융상품 조회 도구의 사용 여부를 결정하고, 조회 결과를 확인한 뒤 답변을
+만듭니다.
 
-    classDef entry fill:#EAF3FB,stroke:#7FB3E1,color:#172033;
-    classDef decision fill:#FFFFFF,stroke:#2F6B64,color:#172033;
-    classDef tool fill:#E9F5F2,stroke:#62A89D,color:#172033;
-    class U,UI,API entry;
-    class TURN decision;
-    class LAW,PRODUCT tool;
-```
+Next.js 상담 화면은 `POST /api/chat`으로 요청을 전달하고, FastAPI의
+`/ask-agent/stream` 응답을 SSE(Server-Sent Events)로 받아 처리 상태와 답변을
+순서대로 표시합니다.
 
-먼저 현재 질문과 이전 상담 조건을 분석해 `clarify`, `out_of_scope`, `ready` 중 다음
-경로를 정합니다. 준비된 질문은 Claude가 법령 검색과 정기예금 조회 Tool의 사용 여부와
-순서를 선택하고, Tool 결과를 확인한 뒤 최종 답변을 만듭니다. Next.js 화면은
-`POST /api/chat`을 통해 FastAPI의 `/ask-agent/stream` SSE 응답을 전달받습니다.
+## 실행하기
 
-## 법령 데이터와 검색 근거
+### 사전 확인
 
-법령 corpus는 국가법령정보 공동활용 Open API에서 수집한 XML snapshot입니다. 현재
-금융소비자보호법·예금자보호법과 각 시행령, 총 4건을 사용하며 수집 기준일은
-**2026-07-06**입니다.
+- Python 3.13과 [uv](https://docs.astral.sh/uv/)
+- Node.js 20.9 이상
+- [Anthropic API 키](https://console.anthropic.com/)와 금융감독원 Finlife API 키
+- macOS 또는 Linux 셸 환경
 
-- [법령 XML과 출처·수집 기준](data/laws/README.md)
-- [버전 관리되는 법령 원문](data/laws/)
-- [RAG 개발·회귀평가 Dataset](data/evaluation/README.md)
-
-Chroma 인덱스(`data/index/`)는 원문에서 다시 만들 수 있는 로컬 산출물이므로 Git에
-포함하지 않습니다. 다음 명령으로 인덱스를 만들고, 저장된 조문·청크 수와 검색 준비
-상태를 직접 확인할 수 있습니다.
-
-```bash
-uv run python scripts/build_index.py
-uv run python scripts/verify_index.py
-```
-
-정기예금 정보는 금융감독원 금융상품 한눈에 Finlife API의 은행권 공시를 요청 시점에
-조회합니다. 상품 순서는 LLM이 임의로 정하지 않고 Python 비교 로직이 기간과 선택한
-금리 기준으로 결정합니다.
-
-## 빠르게 시작하기
-
-Python 3.13, [uv](https://docs.astral.sh/uv/)와 Node.js 20.9 이상이 필요합니다.
+법령 인덱스는 저장소의 XML 원문에서 로컬로 생성합니다. 금융상품 정보는 실행 중
+Finlife API에서 조회하므로 두 API 키가 모두 있어야 전체 상담 흐름을 확인할 수 있습니다.
 
 ### 최초 한 번 준비
 
 ```bash
-cp .env.example .env  # 기존 .env가 있다면 생략
+git clone https://github.com/SWHee/finbom-agent.git
+cd finbom-agent
+cp .env.example .env
+
 uv sync --locked
 uv run python scripts/build_index.py
 npm --prefix frontend ci
 ```
 
-루트 `.env`의 실행 키는 한곳에서 설정합니다.
+루트 `.env`에서 실행 키와 생성 모델을 설정합니다.
 
 ```dotenv
 CHATBOT_BACKEND=anthropic
@@ -148,9 +120,7 @@ ANTHROPIC_MODEL=claude-haiku-4-5-20251001
 FINLIFE_API_KEY=<your-finlife-api-key>
 ```
 
-### 가장 빠른 실행
-
-준비가 끝났다면 한 명령으로 FastAPI와 Next.js를 함께 실행할 수 있습니다.
+### 한 명령으로 실행
 
 ```bash
 ./scripts/run.sh
@@ -160,9 +130,9 @@ FINLIFE_API_KEY=<your-finlife-api-key>
 - FastAPI 문서: `http://127.0.0.1:8000/docs`
 - 종료: `Ctrl+C`
 
-### 서버를 따로 실행
+### 서버를 나누어 실행
 
-각 서버의 로그를 나누어 볼 때는 두 터미널에서 실행합니다.
+서버별 로그를 따로 확인할 때는 두 터미널에서 실행합니다.
 
 ```bash
 # terminal 1
@@ -174,35 +144,55 @@ uv run fastapi dev
 npm --prefix frontend run dev
 ```
 
-## 확인해야 할 범위
+## 데이터 출처와 검색 근거
 
-- 핀봄의 답변과 표시된 법령·공시 정보는 참고용이며 법적 효력이나 법률·금융 자문을
-  제공하지 않습니다. 최신 내용과 실제 가입·보호 여부는 관계 기관과 해당 금융회사에서
-  다시 확인해야 합니다.
-- 법령 corpus는 고정 snapshot이며 실시간 법령 동기화 기능은 아직 없습니다.
-- 현재 상품 Tool은 **은행권 정기예금 비교만** 지원합니다. 적금에 관한 일반 법령 질문과
-  적금 상품 공시 조회는 서로 다른 범위입니다.
+법령 원문은 국가법령정보 공동활용 Open API에서 수집한 XML 스냅샷입니다. 현재
+금융소비자보호법·예금자보호법과 각 시행령, 총 4건을 사용하며 수집 기준일은
+**2026-07-06**입니다.
+
+- [법령 XML의 출처와 수집 기준](data/laws/README.md)
+- [버전 관리되는 법령 원문](data/laws/)
+- [RAG 개발·회귀평가 데이터셋](data/evaluation/README.md)
+
+Chroma 인덱스(`data/index/`)는 법령 원문에서 다시 만들 수 있는 로컬 산출물이므로
+Git에 포함하지 않습니다. 다음 명령은 저장된 조문·청크 수와 검색 준비 상태를
+보여 줍니다.
+
+```bash
+uv run python scripts/verify_index.py
+```
+
+정기예금 정보는 Finlife API의 은행권 공시를 요청 시점에 조회합니다. 상품 순서는
+LLM이 정하지 않으며, Python 비교 로직이 가입 기간과 사용자가 선택한 금리 기준으로
+결정합니다.
+
+## 지원 범위와 주의사항
+
+- 법령 원문은 고정 스냅샷이며 실시간으로 동기화되지 않습니다.
+- 현재 금융상품 조회는 **은행권 정기예금 비교만** 지원합니다.
 - 상품 비교는 사용자가 선택한 조건에 따른 후보 안내이며 개인별 최적 상품을 판정하는
   금융상품 추천이 아닙니다.
+- 최신 법령, 실제 가입 조건과 예금자보호 여부는 관계 기관과 해당 금융회사에서 다시
+  확인해야 합니다.
 
-## 다음 개선
+## 개발 문서
 
-- BM25 키워드 검색과 현재 벡터 검색을 결합한 하이브리드 검색 구현·회귀 테스트
-- Finlife 적금 공시의 정규화·비교 로직과 Agent 상품 Tool 연결
-
-평가 조건, 실험 결과와 구현 기록은 [개발 문서 허브](docs/README.md)에서 관리합니다.
+공개 README는 현재 실행 가능한 기능과 사용법만 다룹니다. 구현 예정 작업, README
+핫픽스, 설계 결정, 평가·실험 결과, 문제 해결 기록과 회고는
+[개발 문서 허브](docs/README.md)에서 역할별로 관리합니다.
 
 ## 저장소 구조
 
 ```text
-korean-chatbot/
+finbom-agent/
 ├── frontend/                 핀봄 상담 UI (Next.js, localhost:3001)
-├── src/chatbot/              Agent·RAG·FastAPI
-├── data/laws/                버전 관리되는 법령 XML snapshot
-├── data/evaluation/          개발·회귀평가 Dataset과 fixture
+├── src/chatbot/              에이전트·RAG·FastAPI
+├── data/laws/                버전 관리되는 법령 XML 스냅샷
+├── data/evaluation/          개발·회귀평가 데이터셋과 fixture
 ├── scripts/                  실행·수집·인덱싱·검증 명령
-├── tests/                    backend 단위·흐름 테스트
-└── docs/                     개발·평가·설계 문서
+├── tests/                    백엔드 단위·흐름 테스트
+└── docs/                     개발·평가·설계 문서 모음
 ```
-초기 from-scratch Transformer 코드는 현재 주력 경로와 분리해
-[experiments/from_scratch](experiments/from_scratch/README.md)에 보존되어 있습니다.
+
+초기 from-scratch Transformer 코드는 현재 애플리케이션과 분리해
+[experiments/from_scratch](experiments/from_scratch/README.md)에 보존하고 있습니다.

@@ -9,7 +9,7 @@
 <h1 align="center">Finbom</h1>
 
 <p align="center">
-  A multi-turn financial assistant that explains Korean laws and deposit products with evidence
+  A multi-turn financial assistant grounded in Korean law and financial-product disclosures
 </p>
 
 <p align="center">
@@ -18,128 +18,102 @@
 
 <p align="center">
   <a href="https://www.python.org/">
-    <img alt="Python 3.13" src="https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white">
+    <img alt="Python 3.13" src="https://img.shields.io/badge/Python-3.13-5D8BB7?style=flat-square&labelColor=0B1220&logo=python&logoColor=white">
   </a>
   <a href="https://fastapi.tiangolo.com/">
-    <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-0.138+-009688?style=flat-square&logo=fastapi&logoColor=white">
+    <img alt="FastAPI 0.138+" src="https://img.shields.io/badge/FastAPI-0.138+-5D8BB7?style=flat-square&labelColor=0B1220&logo=fastapi&logoColor=white">
   </a>
-  <a href="https://docs.langchain.com/oss/python/langgraph/">
-    <img alt="LangGraph" src="https://img.shields.io/badge/LangGraph-1.2+-1C3C3C?style=flat-square">
+  <a href="https://docs.langchain.com/oss/python/langchain/overview">
+    <img alt="LangChain Core 1.4+" src="https://img.shields.io/badge/LangChain_Core-1.4+-5D8BB7?style=flat-square&labelColor=0B1220">
+  </a>
+  <a href="https://docs.langchain.com/oss/python/langgraph/overview">
+    <img alt="LangGraph 1.2+" src="https://img.shields.io/badge/LangGraph-1.2+-5D8BB7?style=flat-square&labelColor=0B1220">
+  </a>
+  <a href="https://www.anthropic.com/claude">
+    <img alt="Claude API" src="https://img.shields.io/badge/Claude-API-5D8BB7?style=flat-square&labelColor=0B1220&logo=anthropic&logoColor=white">
   </a>
   <a href="https://nextjs.org/">
-    <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-000000?style=flat-square&logo=next.js&logoColor=white">
+    <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-5D8BB7?style=flat-square&labelColor=0B1220&logo=next.js&logoColor=white">
   </a>
 </p>
 
 <p align="center">
-  <a href="#financial-guidance-with-verifiable-evidence">Overview</a> ·
-  <a href="#what-finbom-can-do">Features</a> ·
-  <a href="#from-question-to-answer">Agent flow</a> ·
-  <a href="#legal-data-and-retrieval-evidence">Data</a> ·
-  <a href="#quick-start">Quick start</a> ·
+  <a href="#financial-guidance-that-shows-its-sources">Overview</a> ·
+  <a href="#current-capabilities">Capabilities</a> ·
+  <a href="#consultation-flow">Flow</a> ·
+  <a href="#run-finbom">Run</a> ·
+  <a href="#data-sources-and-retrieval-evidence">Data</a> ·
   <a href="docs/README.md">Development docs (KO)</a>
 </p>
 
 ---
 
-## Financial guidance with verifiable evidence
+## Financial guidance that shows its sources
 
 For financial questions, verifying **which sources support an answer** matters as much as receiving
 the answer itself. Finbom retrieves Korean depositor-protection and financial-consumer laws,
-compares bank time-deposit candidates from Finlife disclosures, and presents the answer alongside
-its evidence.
+compares bank time-deposit candidates from Korea's Finlife disclosures, and presents each answer
+alongside its evidence.
 
-The friendly mascot **Poki** guides users through statutory provisions and product comparisons in
-one continuous experience, without assuming familiarity with legal or developer tools.
+The friendly mascot **Poki** guides users through statutory provisions, product comparisons, and
+answers in one workspace.
 
-## What Finbom can do
+> [!IMPORTANT]
+> Finbom's answers and displayed sources from Korean public institutions are for reference only.
+> They have no legal effect and do not constitute legal or financial advice.
 
-- **Explain legal grounds** — cites the law, article number, and effective date for questions about
-  depositor protection and financial-consumer rights.
+## Current capabilities
+
+- **Verify legal grounds** — presents the law, article number, and effective date for questions
+  about depositor protection and financial-consumer rights.
 - **Compare time-deposit candidates** — sorts Finlife bank disclosures by term and either base or
   maximum interest rate.
-- **Clarify missing conditions across turns** — asks for one missing condition at a time and keeps
-  confirmed preferences in a SQLite checkpoint for the same consultation thread.
-- **Combine laws and products** — lets the Agent use both tools when a question needs legal evidence
-  and product candidates.
-- **Handle unsupported topics explicitly** — routes unsupported questions to `out_of_scope` instead
-  of inventing an unrelated answer.
-- **Keep evidence visible** — streams status and answer updates while separating the answer, legal
-  sources, and product data in the UI.
+- **Clarify conditions across turns** — asks for one missing condition at a time and reuses confirmed
+  conditions in the same consultation.
+- **Combine laws and products** — retrieves both legal evidence and product disclosures when a
+  question requires them together.
+- **Separate answers from evidence** — streams the answer while keeping the cited laws and financial
+  products visible in dedicated areas.
 
-## From question to answer
+## Consultation flow
 
-```mermaid
-flowchart TB
-    U([User question]) --> UI[Next.js chat UI]
-    UI --> API[FastAPI Agent API]
+![A user question moves through the Next.js interface, FastAPI, and the LangGraph agent before returning an answer grounded in Korean law and Finlife disclosures](docs/assets/finbom-consultation-flow.svg)
 
-    subgraph AGENT[LangGraph multi-turn Agent]
-        direction TB
-        TURN{Analyze current turn}
-        TURN -->|clarify| CLARIFY[Ask for a missing condition]
-        TURN -->|out_of_scope| SCOPE[Explain supported scope]
-        TURN -->|ready| MODEL[Claude tool-calling model]
-        MODEL <-->|legal evidence| LAW[[Law retrieval tool]]
-        MODEL <-->|time-deposit disclosures| PRODUCT[[Finlife product tool]]
-        MEMORY[(SQLite checkpoint)] <--> TURN
-    end
+Finbom first analyzes the current question and previous consultation conditions. It asks a follow-up
+when information is missing and explains its supported scope for unsupported questions. When the
+question is ready, Claude decides whether to use the law-retrieval or financial-product tool,
+examines the retrieved data, and produces the answer.
 
-    API --> TURN
-    CLARIFY --> RESULT[Answer · sources · products]
-    SCOPE --> RESULT
-    MODEL -->|no more tool calls| RESULT
-    RESULT --> UI
+The Next.js interface forwards requests through `POST /api/chat` and consumes the FastAPI
+`/ask-agent/stream` response as Server-Sent Events (SSE), displaying status and answer updates in
+order.
 
-    classDef entry fill:#EAF3FB,stroke:#7FB3E1,color:#172033;
-    classDef decision fill:#FFFFFF,stroke:#2F6B64,color:#172033;
-    classDef tool fill:#E9F5F2,stroke:#62A89D,color:#172033;
-    class U,UI,API entry;
-    class TURN decision;
-    class LAW,PRODUCT tool;
-```
+## Run Finbom
 
-Finbom first classifies the current turn as `clarify`, `out_of_scope`, or `ready`. For a ready
-question, Claude decides whether and in which order to call the law-retrieval and time-deposit
-tools, examines their outputs, and produces the final answer. The Next.js UI forwards requests
-through `POST /api/chat` and consumes the FastAPI `/ask-agent/stream` SSE response.
+### Prerequisites
 
-## Legal data and retrieval evidence
+- Python 3.13 and [uv](https://docs.astral.sh/uv/)
+- Node.js 20.9 or later
+- An [Anthropic API key](https://console.anthropic.com/) and a Finlife API key
+- A macOS or Linux shell environment
 
-The legal corpus is an XML snapshot collected from Korea's National Law Information Open API. It
-currently covers four documents: the Financial Consumer Protection Act, the Depositor Protection
-Act, and both enforcement decrees. The snapshot date is **2026-07-06**.
-
-- [Legal XML sources and collection notes (KO)](data/laws/README.md)
-- [Versioned legal source files](data/laws/)
-- [RAG development and regression dataset (KO)](data/evaluation/README.md)
-
-The Chroma index (`data/index/`) is a reproducible local artifact and is not committed. Build it
-from the XML sources and inspect the stored article/chunk counts with:
-
-```bash
-uv run python scripts/build_index.py
-uv run python scripts/verify_index.py
-```
-
-Time-deposit data is fetched at request time from the bank disclosures provided by Korea's Finlife
-API. A deterministic Python comparison selects candidates by term and the requested interest-rate
-criterion; the LLM does not reorder the ranking.
-
-## Quick start
-
-Finbom requires Python 3.13, [uv](https://docs.astral.sh/uv/), and Node.js 20.9 or later.
+The legal index is generated locally from the XML sources in this repository. Financial-product
+data is fetched from Finlife at runtime, so both API keys are required to exercise the full
+consultation flow.
 
 ### One-time setup
 
 ```bash
-cp .env.example .env  # skip when .env already exists
+git clone https://github.com/SWHee/finbom-agent.git
+cd finbom-agent
+cp .env.example .env
+
 uv sync --locked
 uv run python scripts/build_index.py
 npm --prefix frontend ci
 ```
 
-Keep the runtime keys together in the root `.env` file:
+Configure the runtime keys and generation model in the root `.env` file:
 
 ```dotenv
 CHATBOT_BACKEND=anthropic
@@ -148,9 +122,7 @@ ANTHROPIC_MODEL=claude-haiku-4-5-20251001
 FINLIFE_API_KEY=<your-finlife-api-key>
 ```
 
-### Fastest way to run
-
-After setup, start FastAPI and Next.js together with one command:
+### Start both servers
 
 ```bash
 ./scripts/run.sh
@@ -160,7 +132,7 @@ After setup, start FastAPI and Next.js together with one command:
 - FastAPI docs: `http://127.0.0.1:8000/docs`
 - Stop both servers: `Ctrl+C`
 
-### Run the servers separately
+### Start the servers separately
 
 Use two terminals when you want separate logs:
 
@@ -174,30 +146,46 @@ uv run fastapi dev
 npm --prefix frontend run dev
 ```
 
+## Data sources and retrieval evidence
+
+The legal corpus is an XML snapshot collected from Korea's National Law Information Open API. It
+currently covers four documents: the Financial Consumer Protection Act, the Depositor Protection
+Act, and both enforcement decrees. The snapshot date is **2026-07-06**.
+
+- [Legal XML sources and collection notes (KO)](data/laws/README.md)
+- [Versioned legal source files](data/laws/)
+- [RAG development and regression dataset (KO)](data/evaluation/README.md)
+
+The Chroma index (`data/index/`) is a reproducible local artifact and is not committed. Inspect the
+stored article and chunk counts and confirm that retrieval is ready with:
+
+```bash
+uv run python scripts/verify_index.py
+```
+
+Time-deposit data is fetched at request time from the bank disclosures provided by Korea's Finlife
+API. A deterministic Python comparison selects candidates by term and the requested interest-rate
+criterion; the LLM does not reorder the ranking.
+
 ## Scope and limitations
 
-- Finbom's answers and displayed legal or disclosure information are for reference only. They have
-  no legal effect and do not constitute legal or financial advice. Verify current information and
-  actual coverage with the relevant authority and financial institution.
 - The legal corpus is a fixed snapshot and is not synchronized in real time.
-- The current product tool supports **bank time deposits only**. General legal questions about
-  savings products and retrieving savings-product disclosures are separate capabilities.
+- Financial-product retrieval currently supports **bank time deposits only**.
 - Product comparisons are condition-based candidate lists, not personalized determinations of the
   best financial product.
+- Verify current laws, actual enrollment terms, and depositor-protection coverage with the relevant
+  authority and financial institution.
 
-## Next improvements
+## Development documentation
 
-- Implement and regression-test hybrid retrieval that combines BM25 keyword search with the current
-  vector search.
-- Normalize and compare Finlife savings disclosures, then connect them to the Agent product tool.
-
-Evaluation conditions, experiments, and implementation records are organized in the
-[development documentation hub (KO)](docs/README.md).
+This public README covers only the current runnable features and usage. Planned implementation,
+README hotfixes, architecture decisions, evaluations, experiments, troubleshooting notes, and
+retrospectives are organized in the [development documentation hub (KO)](docs/README.md).
 
 ## Repository layout
 
 ```text
-korean-chatbot/
+finbom-agent/
 ├── frontend/                 Finbom chat UI (Next.js, localhost:3001)
 ├── src/chatbot/              Agent, RAG, and FastAPI
 ├── data/laws/                Versioned legal XML snapshot
@@ -208,4 +196,4 @@ korean-chatbot/
 ```
 
 The initial [from-scratch Transformer implementation](experiments/from_scratch/README.md) is
-preserved separately from the current application path.
+archived separately from the current application.
