@@ -5,6 +5,11 @@
 **/__pycache__/
 *.pyc
 
+# Local editor and frontend build output
+.DS_Store
+/.claude/
+**/.next/
+
 # Derived vector index (scripts/build_index.py로 재생성)
 /data/index/
 

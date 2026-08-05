@@ -1,5 +1,13 @@
 <p align="center">
   <img
+    src="docs/assets/finbom_demo_gif.gif"
+    alt="핀봄 상담 화면 미리보기"
+    width="640"
+  />
+</p>
+
+<p align="center">
+  <img
     src="docs/assets/readme-hero-finbom.png"
     alt="근거 연결망과 금융 문서 사이에서 안내하는 핀봄 상담 마스코트 포키"
     width="100%"
@@ -28,9 +36,6 @@
   </a>
   <a href="https://docs.langchain.com/oss/python/langgraph/overview">
     <img alt="LangGraph 1.2+" src="https://img.shields.io/badge/LangGraph-1.2+-5D8BB7?style=flat-square&labelColor=0B1220">
-  </a>
-  <a href="https://www.anthropic.com/claude">
-    <img alt="Claude API" src="https://img.shields.io/badge/Claude-API-5D8BB7?style=flat-square&labelColor=0B1220&logo=anthropic&logoColor=white">
   </a>
   <a href="https://nextjs.org/">
     <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16-5D8BB7?style=flat-square&labelColor=0B1220&logo=next.js&logoColor=white">
@@ -74,15 +79,6 @@ Finlife 공시에서 은행권 정기예금 후보를 비교해 답변과 근거
 - **답변과 근거 분리 표시** — 답변을 스트리밍하고, 사용한 법령과 금융상품 정보를 별도
   영역에서 확인할 수 있습니다.
 
-## UI 미리보기
-
-<p align="center">
-  <img
-    src="docs/assets/finbom_demo_gif.gif"
-    alt="핀봄이 금융 질문을 받고 근거와 함께 상담하는 화면"
-    width="464"
-  />
-</p>
 
 ## 상담 처리 흐름
 
