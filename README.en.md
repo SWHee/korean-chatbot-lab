@@ -75,6 +75,16 @@ answers in one workspace.
 - **Separate answers from evidence** — streams the answer while keeping the cited laws and financial
   products visible in dedicated areas.
 
+## UI preview
+
+<p align="center">
+  <img
+    src="docs/assets/finbom_demo_gif.gif"
+    alt="Finbom receives a financial question and presents its answer with supporting evidence"
+    width="464"
+  />
+</p>
+
 ## Consultation flow
 
 ![A user question moves through the Next.js interface, FastAPI, and the LangGraph agent before returning an answer grounded in Korean law and Finlife disclosures](docs/assets/finbom-consultation-flow.svg)

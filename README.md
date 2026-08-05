@@ -74,6 +74,16 @@ Finlife 공시에서 은행권 정기예금 후보를 비교해 답변과 근거
 - **답변과 근거 분리 표시** — 답변을 스트리밍하고, 사용한 법령과 금융상품 정보를 별도
   영역에서 확인할 수 있습니다.
 
+## UI 미리보기
+
+<p align="center">
+  <img
+    src="docs/assets/finbom_demo_gif.gif"
+    alt="핀봄이 금융 질문을 받고 근거와 함께 상담하는 화면"
+    width="464"
+  />
+</p>
+
 ## 상담 처리 흐름
 
 ![사용자 질문이 Next.js, FastAPI와 LangGraph 에이전트를 거쳐 법령·금융상품 근거가 포함된 답변으로 이어지는 흐름](docs/assets/finbom-consultation-flow.svg)
