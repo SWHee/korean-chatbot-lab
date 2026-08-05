@@ -1,16 +1,17 @@
-<p align="center">
-  <img
-    src="docs/assets/finbom_demo_gif.gif"
-    alt="핀봄 상담 화면 미리보기"
-    width="640"
-  />
-</p>
-
+<!--
 <p align="center">
   <img
     src="docs/assets/readme-hero-finbom.png"
     alt="근거 연결망과 금융 문서 사이에서 안내하는 핀봄 상담 마스코트 포키"
     width="100%"
+  />
+</p>
+-->
+
+<p align="center">
+  <img width="1280" width="100%"
+    alt="Image"
+    src="https://github.com/user-attachments/assets/595c2145-4a2c-48f8-9661-accb862e3bec"
   />
 </p>
 
