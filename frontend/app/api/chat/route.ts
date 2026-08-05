@@ -1,6 +1,7 @@
 const DEFAULT_API_URL = "http://127.0.0.1:8000";
 const AGENT_STREAM_PATH = "/ask-agent/stream";
 
+/** 브라우저 요청을 FastAPI Agent 스트림으로 그대로 중계 */
 export async function POST(request: Request) {
   let question: unknown;
   let threadId: unknown;
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   }
 
   if (typeof threadId !== "string" || !threadId.trim()) {
-    return new Response("새 대화를 시작한 뒤 다시 시도해 주세요.", { status: 400 });
+    return new Response("새 상담을 시작한 뒤 다시 시도해 주세요.", { status: 400 });
   }
 
   const apiUrl = process.env.CHATBOT_API_URL ?? DEFAULT_API_URL;
@@ -30,13 +31,11 @@ export async function POST(request: Request) {
     });
 
     if (!response.ok) {
-      return new Response("법령 답변 서버가 요청을 처리하지 못했습니다.", {
-        status: response.status,
-      });
+      return new Response("Agent 서버가 요청을 처리하지 못했습니다.", { status: response.status });
     }
 
     if (!response.body) {
-      return new Response("법령 답변 서버의 스트림이 비어 있습니다.", { status: 502 });
+      return new Response("Agent 서버의 스트림이 비어 있습니다.", { status: 502 });
     }
 
     return new Response(response.body, {

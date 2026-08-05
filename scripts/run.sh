@@ -39,7 +39,7 @@ cd "$PROJECT_ROOT"
 trap cleanup EXIT INT TERM
 
 echo "FastAPI: http://127.0.0.1:8000/docs"
-echo "Next.js: http://localhost:3000"
+echo "Next.js: http://localhost:3001"
 echo "종료: Ctrl+C"
 
 uv run fastapi dev &
