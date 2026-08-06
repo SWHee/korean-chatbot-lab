@@ -30,7 +30,7 @@
 | [`01-rag-latency`](01-rag-latency/) | 측정 설계 | 토큰 상한을 아직 변경하지 않음 |
 | [`02-rag-response-reliability`](02-rag-response-reliability/) | Structured Output v2 구현 | 간결화 Prompt 후보는 미채택 |
 | [`03-early-fallback-streaming`](03-early-fallback-streaming/) | 구현·단위 검증 | `can_answer=false` 즉시 고정 안내로 전환 |
-| [`04-retrieval-robustness`](04-retrieval-robustness/) | 개선 지도 작성 | Agent POC 뒤 기술별 문서로 분리 |
+| [`04-retrieval-robustness`](04-retrieval-robustness/) | Hybrid Search 구현·개발 데이터 비교 | Dense 우선, 2글자 BM25 보조 신호 채택 |
 | [`05-safe-answer-coverage`](05-safe-answer-coverage/) | 문제·비교 기준 정리 | 안전성을 유지하며 유효 답변 도달률 개선 |
 
 검색 개선의 전체 후보와 순서는
