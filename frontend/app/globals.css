@@ -1069,7 +1069,7 @@ button:disabled {
 /* 화면에 고정되는 장면 — 부모의 높이가 그대로 스크롤 길이가 된다 */
 .story-scroll {
   position: relative;
-  height: 420vh;
+  height: 600vh;
   background: transparent;
   color: var(--fg);
 }
@@ -1611,7 +1611,7 @@ button:disabled {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  min-height: 100dvh;
+  min-height: 95dvh;
   padding: var(--space-6) var(--space-5) var(--space-5);
   background: transparent;
   color: var(--fg);

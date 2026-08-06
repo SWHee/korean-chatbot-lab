@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "핀봄 | 근거와 함께 확인하는 금융 상담",
+  title: "핀봄 (Finbom) | 근거와 함께 확인하는 금융 상담",
   description:
     "예금자보호와 금융소비자 권리를 법령에서 찾아 근거와 함께 설명하는 상담 서비스",
 };

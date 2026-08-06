@@ -154,7 +154,7 @@ export function ChatConsole() {
           <BrandLogo />
           <div>
             <span className="brand-name">핀봄</span>
-            <span className="brand-sub">예금자보호 · 금융소비자 상담</span>
+            <span className="brand-sub">포키와 함께하는 금융 상담</span>
           </div>
         </div>
 

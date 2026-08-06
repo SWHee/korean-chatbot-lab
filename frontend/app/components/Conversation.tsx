@@ -83,7 +83,7 @@ export function Conversation({
           <article className="turn" key={index} data-role="assistant">
             <div className="bot-head">
               <BrandLogo variant="avatar" />
-              <span className="bot-name">핀봄</span>
+              <span className="bot-name">포키</span>
             </div>
             <div className="bot-body">
               {turn.content ? (
