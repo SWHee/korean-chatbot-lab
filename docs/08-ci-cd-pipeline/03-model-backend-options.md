@@ -1,113 +1,41 @@
-# 로컬 Qwen3에서 모델 API로 바꿀 때
+# 배포 생성 모델 결정
 
-- 작성일: 2026-07-30
-- 현재 기준: Ollama의 `qwen3:4b-instruct-2507-q4_K_M`
-- 목적: 배포 환경의 생성 속도와 품질이 부족할 때 참고할 전환 기준
+- 최초 작성: 2026-07-30
+- 결정 갱신: 2026-08-06
 
-## 현재 구조에서 느려지는 지점
+## 결정
 
-현재 답변은 두 단계로 만들어진다.
-
-```text
-법령 검색 → Qwen3 답변 생성
-```
-
-Mac의 Docker Desktop은 Apple GPU를 Ollama 컨테이너에 넘겨주지 못한다. 이 때문에
-검색이 끝나도 Qwen3가 CPU에서 답변을 한 글자씩 만드는 시간이 길어진다. 일반 CPU
-EC2에 같은 Compose를 배포해도 생성 속도 문제는 남을 가능성이 높다.
-
-모델 API로 바꾸면 법령 검색은 현재 서버에서 실행하고, 답변 생성만 외부의 빠른
-서버에 요청하게 된다.
+현재 Agent POC 배포는 Anthropic Claude를 사용하고 Ollama container는 제외한다.
 
 ```text
-현재:   Chroma 검색 → Docker Ollama의 CPU 생성
-전환 후: Chroma 검색 → 외부 모델 API 생성
+이전 RAG 실습: FastAPI → Docker Ollama → Qwen3
+현재 Agent:     FastAPI → Anthropic API → Claude
 ```
 
-## 기대할 수 있는 개선
+현재 Ollama 구현은 `CHATBOT_BACKEND=ollama`를 선택할 수 있지만, Anthropic 호출 실패를
+감지해 Ollama로 자동 전환하는 fallback은 구현되어 있지 않다. Agent의 Tool Calling
+모델도 Claude를 직접 사용한다. 따라서 두 모델을 함께 띄우면 장애 대응은 되지 않고
+EC2 메모리·디스크만 더 사용한다.
 
-- **더 빠른 생성**: CPU Ollama 대신 공급자의 추론 서버 사용
-- **자연스러운 한국어**: 상담 말투와 긴 설명의 품질 개선 가능
-- **지시 준수**: 시스템 메시지와 답변 제한을 더 안정적으로 따를 가능성
-- **출력 형식 안정성**: Structured Output의 JSON Schema 준수율 개선 가능
-- **Agent 확장 준비**: Tool Calling과 복수 단계 판단의 안정성 개선 가능
-- **배포 부담 감소**: Ollama container, 모델 volume과 GPU instance가 불필요
+## 배포에서 달라진 점
 
-모델이 커진다고 법령 답변이 자동으로 정확해지는 것은 아니다. 더 자연스럽게 잘못된
-답을 만들 수도 있으므로 기존 근거 검증과 평가는 계속 필요하다.
+- `ollama` service와 Qwen model volume 제거
+- API 컨테이너에 `ANTHROPIC_API_KEY`, `FINLIFE_API_KEY` 전달
+- 일반 CPU EC2에서도 로컬 생성 모델을 메모리에 올리지 않음
+- 모델 weight 대신 질문별 API 사용료 발생
+- 인터넷 연결, 공급자 사용량 제한과 장애의 영향을 받음
 
-## 새로 생기는 비용과 제약
+KURE 임베딩과 Chroma 검색은 EC2 API 컨테이너에서 계속 실행된다. 따라서 PyTorch,
+Transformers와 Hugging Face cache까지 없어지는 것은 아니다.
 
-- 질문과 법령 문맥의 토큰 수만큼 사용료 발생
-- 인터넷 연결과 모델 공급자의 장애·사용량 제한에 영향
-- API key를 로컬과 배포 환경에서 안전하게 관리할 필요
-- 사용자 질문을 외부 서버로 보내므로 데이터 처리 정책 확인 필요
+## 보존하는 범위
 
-따라서 API 전환은 모든 면에서 상위 호환이 아니다. 현재 POC에서는 GPU instance
-운영 비용과 모델 API 사용료, 응답 속도와 품질을 같은 질문으로 비교해 선택한다.
+Ollama 코드와 과거 결과는 오픈웨이트 모델 비교·학습 자료로 유지한다. 다시 배포 후보로
+검토하려면 다음을 먼저 구현하고 별도 Compose로 검증한다.
 
-## 바뀌지 않는 부분
+1. Agent Tool Calling을 지원하는 Ollama 모델 경로
+2. 어떤 오류에서 전환할지 정한 fallback 정책
+3. 같은 요청의 중복 실행과 Tool 재호출 방지
+4. EC2 메모리·응답 시간·모델 저장 공간 비교
 
-모델 API는 `generate` 단계만 바꾼다. 다음 문제는 별도로 개선해야 한다.
-
-- KURE 질문 임베딩과 Chroma 검색 시간
-- 검색된 조문의 관련성
-- 법령 원본의 범위와 최신성
-- 프롬프트의 요구사항과 충돌
-- Finlife 상품 비교 규칙
-
-전체 응답 시간을 줄이려면 검색 시간, 첫 답변 조각이 도착한 시간, 생성 완료 시간을
-각각 측정해야 한다.
-
-## 프로젝트에서 바꿀 범위
-
-현재 RAG는 특정 공급자 이름이 아니라 생성기의 다음 네 기능을 사용한다.
-
-```text
-generate
-stream
-generate_structured
-stream_structured
-```
-
-새 모델 API 구현체가 같은 기능을 제공하면 법령 검색, LangGraph 구조와 Next.js
-화면은 유지할 수 있다.
-
-| 변경 대상 | 내용 |
-| --- | --- |
-| 새 API 생성기 | 일반·스트리밍·구조화 응답 구현 |
-| `main.py` | `CHATBOT_BACKEND` 선택지 추가 |
-| 의존성과 환경 변수 | 공식 SDK, API key, 모델 이름 추가 |
-| `docker-compose.yml` | API key 전달, Ollama 의존성 선택 또는 제거 |
-| 테스트 | 생성기 계약과 backend 선택 검증 |
-
-API key는 이미지나 Git 저장소에 넣지 않고 로컬 `.env`, EC2 환경 변수 또는 GitHub
-Secret으로 전달한다.
-
-## 선택한 전환 순서
-
-Agent 개발에서는 남은 크레딧을 먼저 활용할 수 있는 Claude Haiku를 첫 API backend로
-연결하고, 같은 생성 계약으로 OpenAI를 후속 backend에 추가한다. Ollama Qwen3는 로컬
-기준선과 오픈웨이트 실습용으로 보존한다.
-
-모델을 바꾼 이유, 각 backend의 역할과 구현 순서는
-[`Agent 확장 전 생성 모델 backend 전환 계획`](../07-langgraph-agent/02-generation-model-backend-transition.md)에
-기록한다. 이 문서는 선택한 모델을 Docker·EC2에서 실행할 때 달라지는 범위만 다룬다.
-
-## 전환 여부를 판단하는 비교
-
-법령 RAG의 corpus, 검색 설정과 프롬프트를 그대로 두고 모델만 바꾼다. 기존 24문항은
-Agent 전체 평가에는 부족하지만, 같은 법령 RAG에서 생성 모델만 비교하는 용도로는
-계속 사용할 수 있다.
-
-| 비교 항목 | 확인할 내용 |
-| --- | --- |
-| 첫 응답 시간 | 질문 후 첫 글자가 보일 때까지의 시간 |
-| 전체 시간 | 검색부터 답변 완료까지 걸린 시간 |
-| 답변 품질 | 한국어 말투, 설명의 충분함, 질문에 대한 직접성 |
-| 근거 충실성 | 검색된 법령 밖의 내용을 지어내지 않는지 |
-| 형식 안정성 | Structured Output 검증 실패 비율 |
-| 비용 | 질문 한 건과 24문항 전체 실행 비용 |
-
-첫 구현은 공급자 하나만 연결해 정상 응답 한 건과 구조화 스트리밍 한 건을 확인한다.
-그 결과가 현재 Ollama 기준선보다 나을 때 Compose와 배포 설정을 바꾼다.
+현재 CI/CD 챌린지에는 이 범위를 포함하지 않는다.

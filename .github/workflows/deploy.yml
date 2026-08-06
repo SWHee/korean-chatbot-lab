@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,7 +22,7 @@ jobs:
         with:
           version: "0.11.15"
           python-version: "3.13"
-      - run: uv sync --locked --group evaluation
+      - run: uv sync --locked
       - run: uv run pytest
       - uses: actions/setup-node@v6
         with:
@@ -49,7 +53,9 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot-api:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot-api:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot-api:${{ github.sha }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
@@ -59,7 +65,9 @@ jobs:
           context: ./frontend
           platforms: linux/amd64
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot-web:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot-web:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/korean-chatbot-web:${{ github.sha }}
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=max,scope=web
 
@@ -80,6 +88,11 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -eu
             cd ~/korean-chatbot
-            docker compose pull api web ollama
-            docker compose up -d --remove-orphans
+            test -f .env
+            test -d data/index/chroma
+            IMAGE_TAG=${{ github.sha }} docker compose pull api web
+            IMAGE_TAG=${{ github.sha }} docker compose up -d --remove-orphans --wait --wait-timeout 180
+            IMAGE_TAG=${{ github.sha }} docker compose ps
+            curl --fail --retry 10 --retry-delay 3 --retry-all-errors http://127.0.0.1:3000

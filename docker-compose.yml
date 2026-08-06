@@ -2,9 +2,9 @@ services:
   web:
     build:
       context: ./frontend
-    image: ${DOCKERHUB_USERNAME:-local}/korean-chatbot-web:latest
+    image: ${DOCKERHUB_USERNAME:-local}/korean-chatbot-web:${IMAGE_TAG:-latest}
     ports:
-      - "3000:3000"
+      - "3000:3001"
     environment:
       CHATBOT_API_URL: http://api:8000
     depends_on:
@@ -16,54 +16,45 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:3001').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   api:
     build:
       context: .
-    image: ${DOCKERHUB_USERNAME:-local}/korean-chatbot-api:latest
+    image: ${DOCKERHUB_USERNAME:-local}/korean-chatbot-api:${IMAGE_TAG:-latest}
     environment:
-      CHATBOT_BACKEND: ollama
+      CHATBOT_BACKEND: anthropic
       CHATBOT_INDEX_DIR: /app/data/index/chroma
-      OLLAMA_BASE_URL: http://ollama:11434
-      OLLAMA_TIMEOUT_SECONDS: "300"
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY in .env}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-haiku-4-5-20251001}
+      ANTHROPIC_TIMEOUT_SECONDS: ${ANTHROPIC_TIMEOUT_SECONDS:-60}
+      FINLIFE_API_KEY: ${FINLIFE_API_KEY:?Set FINLIFE_API_KEY in .env}
       LANGFEATHER_ENABLED: "false"
       LANGSMITH_TRACING: "false"
     volumes:
       - ./data/index:/app/data/index
       - huggingface_cache:/root/.cache/huggingface
-    depends_on:
-      ollama:
-        condition: service_healthy
+      - agent_runtime:/app/.runtime
     healthcheck:
       test:
         [
           "CMD",
           "python",
           "-c",
-          "import urllib.request; from chatbot.vectorstore import open_collection; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json'); open_collection()",
+          "import os, urllib.request; from chatbot.vectorstore import open_collection; [os.environ[name] for name in ('ANTHROPIC_API_KEY', 'FINLIFE_API_KEY')]; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json'); open_collection(); assert os.access('/app/.runtime', os.W_OK)",
         ]
       interval: 10s
       timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  ollama:
-    image: ollama/ollama:latest
-    volumes:
-      - ollama_data:/root/.ollama
-    healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      retries: 12
+      start_period: 10s
     restart: unless-stopped
 
 volumes:
   huggingface_cache:
-  ollama_data:
+  agent_runtime:

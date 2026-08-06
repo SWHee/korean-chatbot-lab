@@ -3,8 +3,12 @@
 .venv
 .env
 .pytest_cache
+.runtime
 **/__pycache__
 *.pyc
+*.sqlite3
+.DS_Store
+graphify-out
 
 data/index
 docs
