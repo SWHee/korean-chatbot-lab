@@ -544,6 +544,55 @@ def test_ask_agent_returns_thread_tools_sources_and_products(monkeypatch) -> Non
     assert response.execution_seconds == 2.0
 
 
+def test_agent_execution_details_preserves_saving_product_fields() -> None:
+    """Agent Tool 결과의 적금 구분과 적립 방식 보존"""
+    messages = [
+        HumanMessage(content="12개월 적금 후보를 알려주세요."),
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "search_financial_products",
+                    "args": {"product_type": "saving", "term_months": 12},
+                    "id": "saving-1",
+                    "type": "tool_call",
+                }
+            ],
+        ),
+        ToolMessage(
+            content=json.dumps(
+                {
+                    "status": "ok",
+                    "products": [
+                        {
+                            "product_type": "saving",
+                            "disclosure_month": "202607",
+                            "company_code": "001",
+                            "product_code": "SAVING-001",
+                            "company_name": "테스트은행",
+                            "product_name": "테스트적금",
+                            "term_months": 12,
+                            "base_interest_rate": 3.1,
+                            "max_interest_rate": 3.5,
+                            "reserve_type": "F",
+                            "reserve_type_name": "자유적립식",
+                        }
+                    ],
+                }
+            ),
+            tool_call_id="saving-1",
+            name="search_financial_products",
+        ),
+    ]
+
+    tools, sources, products = main_module._agent_execution_details(messages)
+
+    assert tools[0].status == "ok"
+    assert sources == []
+    assert products[0].product_type == "saving"
+    assert products[0].reserve_type_name == "자유적립식"
+
+
 def test_ask_agent_returns_clarifying_question_without_tools() -> None:
     """조건이 부족한 첫 턴은 Tool 없이 다음 질문을 반환"""
     class FakeAgentGraph:

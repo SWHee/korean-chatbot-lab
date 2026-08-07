@@ -1,10 +1,10 @@
 """금융상품 한눈에 예·적금 API client"""
 
 import os
-from typing import Literal
+from typing import Annotated, Literal
 
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 FINLIFE_DEPOSIT_URL = (
@@ -39,6 +39,7 @@ SUPPORTED_PRODUCT_SORT_FIELDS = (
 class DepositProductOption(BaseModel):
     """정기예금 상품의 기간별 금리 비교 단위"""
 
+    product_type: Literal["deposit"] = "deposit"  # 정기예금 상품 구분값
     disclosure_month: str  # 상품 정보가 공시된 기준 연월
     company_code: str  # 금융회사를 구분하는 Finlife 코드
     product_code: str  # 금융회사 안에서 상품을 구분하는 코드
@@ -55,6 +56,36 @@ class DepositProductComparison(BaseModel):
     term_months: int  # 비교에 사용한 예치 기간
     comparison_basis: ProductSortBy  # 후보 순위를 정한 금리 기준
     products: list[DepositProductOption]  # 정렬과 개수 제한을 적용한 후보
+
+
+class SavingProductOption(BaseModel):
+    """적금 상품의 기간·적립방식별 금리 비교 단위"""
+
+    product_type: Literal["saving"] = "saving"  # 적금 상품 구분값
+    disclosure_month: str  # 상품 정보가 공시된 기준 연월
+    company_code: str  # 금융회사를 구분하는 Finlife 코드
+    product_code: str  # 금융회사 안에서 상품을 구분하는 코드
+    company_name: str  # 상품을 제공하는 금융회사 이름
+    product_name: str  # 적금 상품 이름
+    term_months: int  # 가입 기간의 개월 수
+    base_interest_rate: float | None  # 우대조건 적용 전 기본금리
+    max_interest_rate: float | None  # 우대조건 적용 시 최고금리
+    reserve_type: str  # Finlife 적립 방식 코드
+    reserve_type_name: str  # 정액·자유적립식 등의 적립 방식 이름
+
+
+class SavingProductComparison(BaseModel):
+    """정해진 조건으로 고른 적금 비교 결과"""
+
+    term_months: int  # 비교에 사용한 가입 기간
+    comparison_basis: ProductSortBy  # 후보 순위를 정한 금리 기준
+    products: list[SavingProductOption]  # 정렬과 개수 제한을 적용한 후보
+
+
+FinancialProductOption = Annotated[
+    DepositProductOption | SavingProductOption,
+    Field(discriminator="product_type"),
+]
 
 
 def _product_key(product: dict) -> tuple[str, str, str]:
@@ -205,6 +236,98 @@ def select_deposit_products(
     ]
 
     return DepositProductComparison(
+        term_months=term_months,
+        comparison_basis=sort_by,
+        products=selected_products,
+    )
+
+
+def normalize_saving_products(
+    result: dict,
+) -> list[SavingProductOption]:
+    """적금 기본정보와 기간·적립방식별 금리를 내부 비교 단위로 변환"""
+    product_by_key = {
+        _product_key(product_info): product_info
+        for product_info in result["baseList"]
+    }
+    normalized_products = []  # 내부 필드명과 타입으로 변환한 적금 옵션 목록
+
+    for rate_option in result["optionList"]:
+        product_info = product_by_key.get(_product_key(rate_option))
+        if product_info is None:
+            continue
+
+        normalized_products.append(
+            SavingProductOption(
+                disclosure_month=rate_option["dcls_month"],
+                company_code=rate_option["fin_co_no"],
+                product_code=rate_option["fin_prdt_cd"],
+                company_name=product_info["kor_co_nm"],
+                product_name=product_info["fin_prdt_nm"],
+                term_months=int(rate_option["save_trm"]),
+                base_interest_rate=rate_option["intr_rate"],
+                max_interest_rate=rate_option["intr_rate2"],
+                reserve_type=rate_option["rsrv_type"],
+                reserve_type_name=rate_option["rsrv_type_nm"],
+            )
+        )
+
+    return normalized_products
+
+
+def select_saving_products(
+    products: list[SavingProductOption],
+    *,
+    term_months: int,
+    sort_by: ProductSortBy = DEFAULT_PRODUCT_SORT_BY,
+    limit: int = DEFAULT_PRODUCT_LIMIT,
+) -> SavingProductComparison:
+    """기간과 금리 기준으로 적금 비교 후보 선택"""
+    if sort_by not in SUPPORTED_PRODUCT_SORT_FIELDS:
+        raise ValueError(
+            f"sort_by must be one of {SUPPORTED_PRODUCT_SORT_FIELDS}"
+        )
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+
+    candidates_with_rate = []
+    for product in products:
+        if product.term_months != term_months:
+            continue
+
+        selected_interest_rate = (
+            product.base_interest_rate
+            if sort_by == "base_interest_rate"
+            else product.max_interest_rate
+        )
+        if selected_interest_rate is None:
+            continue
+
+        candidates_with_rate.append((product, selected_interest_rate))
+
+    def comparison_order(
+        candidate: tuple[SavingProductOption, float],
+    ) -> tuple[float, str, str, str, str]:
+        """금리 내림차순과 상품·적립방식 오름차순 정렬 키"""
+        product, selected_interest_rate = candidate
+        return (
+            -selected_interest_rate,
+            product.company_name,
+            product.product_name,
+            product.reserve_type,
+            product.product_code,
+        )
+
+    ranked_candidates = sorted(
+        candidates_with_rate,
+        key=comparison_order,
+    )
+    selected_products = [
+        product
+        for product, _ in ranked_candidates[:limit]
+    ]
+
+    return SavingProductComparison(
         term_months=term_months,
         comparison_basis=sort_by,
         products=selected_products,

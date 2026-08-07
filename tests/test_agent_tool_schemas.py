@@ -109,6 +109,70 @@ def test_product_tool_returns_ranked_deposit_candidates(monkeypatch) -> None:
     assert result["products"][0]["base_interest_rate"] == 3.1
 
 
+def test_product_tool_returns_ranked_saving_candidates(monkeypatch) -> None:
+    """적금 Tool의 후보에 적립 방식 포함"""
+    monkeypatch.setattr(
+        tool_module,
+        "fetch_saving_products",
+        lambda: {
+            "baseList": [
+                {
+                    "dcls_month": "202607",
+                    "fin_co_no": "001",
+                    "fin_prdt_cd": "SAVING-001",
+                    "kor_co_nm": "테스트은행",
+                    "fin_prdt_nm": "테스트적금",
+                }
+            ],
+            "optionList": [
+                {
+                    "dcls_month": "202607",
+                    "fin_co_no": "001",
+                    "fin_prdt_cd": "SAVING-001",
+                    "save_trm": "12",
+                    "intr_rate": 3.1,
+                    "intr_rate2": 3.5,
+                    "rsrv_type": "S",
+                    "rsrv_type_nm": "정액적립식",
+                }
+            ],
+        },
+    )
+    tools = tool_module.create_agent_tools(
+        encoder=object(),
+        collection=object(),
+    )
+    product_tool = next(
+        tool for tool in tools if tool.name == "search_financial_products"
+    )
+
+    result = product_tool.invoke(
+        {
+            "product_type": "saving",
+            "term_months": 12,
+            "sort_by": "base_interest_rate",
+            "limit": 3,
+        }
+    )
+
+    assert result["status"] == "ok"
+    assert result["products"] == [
+        {
+            "product_type": "saving",
+            "disclosure_month": "202607",
+            "company_code": "001",
+            "product_code": "SAVING-001",
+            "company_name": "테스트은행",
+            "product_name": "테스트적금",
+            "term_months": 12,
+            "base_interest_rate": 3.1,
+            "max_interest_rate": 3.5,
+            "reserve_type": "S",
+            "reserve_type_name": "정액적립식",
+        }
+    ]
+
+
 def test_product_tool_returns_error_data_when_finlife_fails(monkeypatch) -> None:
     """Finlife 오류를 ToolNode 예외 대신 상태 데이터로 반환"""
     def raise_finlife_error() -> dict:

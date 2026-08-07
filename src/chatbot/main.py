@@ -10,7 +10,7 @@ from time import perf_counter
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 
 from chatbot.agent.checkpoint import create_sqlite_checkpointer
 from chatbot.agent.graph import create_multi_turn_agent_graph
@@ -18,7 +18,7 @@ from chatbot.agent.model import create_tool_calling_model
 from chatbot.agent.tools import create_agent_tools
 from chatbot.agent.turn_analysis import create_turn_analyzer
 from chatbot.embedding import load_encoder
-from chatbot.finlife import DepositProductOption
+from chatbot.finlife import DepositProductOption, FinancialProductOption
 from chatbot.generator_backend import create_generator
 from chatbot.graph import (
     LawStatus,
@@ -35,6 +35,7 @@ LANGFEATHER_TRACE_NAME = "korean-chatbot-rag"
 LANGFEATHER_WORKFLOW_TRACE_NAME = "korean-chatbot-routed-workflow"
 LANGFEATHER_AGENT_TRACE_NAME = "korean-chatbot-agent"
 LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS = 2.0
+FINANCIAL_PRODUCT_OPTION_ADAPTER = TypeAdapter(FinancialProductOption)
 
 
 def load_langfeather():
@@ -124,7 +125,7 @@ class AgentResponse(BaseModel):
     missing_fields: list[str] = Field(default_factory=list)
     tools: list[AgentToolResult]
     sources: list[AgentSource]
-    products: list[DepositProductOption]
+    products: list[FinancialProductOption]
     execution_seconds: float
 
 
@@ -243,8 +244,11 @@ def _agent_execution_details(
             AgentSource.model_validate(article)
             for article in result.get("articles", [])
         )
+        product_type = tool_call.get("args", {}).get("product_type", "deposit")
         products.extend(
-            DepositProductOption.model_validate(product)
+            FINANCIAL_PRODUCT_OPTION_ADAPTER.validate_python(
+                {"product_type": product_type, **product}
+            )
             for product in result.get("products", [])
         )
 

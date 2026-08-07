@@ -10,8 +10,11 @@ from chatbot.finlife import (
     ProductSortBy,
     ProductType,
     fetch_deposit_products,
+    fetch_saving_products,
     normalize_deposit_products,
+    normalize_saving_products,
     select_deposit_products,
+    select_saving_products,
 )
 from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
 
@@ -111,27 +114,28 @@ def create_agent_tools(
         sort_by: ProductSortBy = DEFAULT_PRODUCT_SORT_BY,
         limit: int = DEFAULT_PRODUCT_LIMIT,
     ) -> dict:
-        """정기예금 비교 후보"""
-        if product_type != "deposit":
-            return {
-                "status": "unsupported",
-                "message": "현재는 정기예금 비교만 지원합니다.",
-            }
-
+        """예·적금 비교 후보"""
         try:
-            result = fetch_deposit_products()
+            if product_type == "deposit":
+                comparison = select_deposit_products(
+                    normalize_deposit_products(fetch_deposit_products()),
+                    term_months=term_months,
+                    sort_by=sort_by,
+                    limit=limit,
+                )
+            else:
+                comparison = select_saving_products(
+                    normalize_saving_products(fetch_saving_products()),
+                    term_months=term_months,
+                    sort_by=sort_by,
+                    limit=limit,
+                )
         except (httpx.HTTPError, RuntimeError):
             return {
                 "status": "error",
                 "message": "Finlife 공시 정보를 불러오지 못했습니다.",
             }
 
-        comparison = select_deposit_products(
-            normalize_deposit_products(result),
-            term_months=term_months,
-            sort_by=sort_by,
-            limit=limit,
-        )
         if not comparison.products:
             return {
                 "status": "no_match",

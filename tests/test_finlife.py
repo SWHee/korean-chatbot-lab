@@ -44,6 +44,32 @@ def _deposit_option(
     )
 
 
+def _saving_option(
+    *,
+    product_code: str,
+    company_name: str,
+    product_name: str,
+    term_months: int,
+    base_interest_rate: float | None,
+    max_interest_rate: float | None,
+    reserve_type: str,
+    reserve_type_name: str,
+):
+    """적금 비교 테스트용 정규화 옵션"""
+    return finlife_module.SavingProductOption(
+        disclosure_month="202607",
+        company_code=f"CO-{company_name}",
+        product_code=product_code,
+        company_name=company_name,
+        product_name=product_name,
+        term_months=term_months,
+        base_interest_rate=base_interest_rate,
+        max_interest_rate=max_interest_rate,
+        reserve_type=reserve_type,
+        reserve_type_name=reserve_type_name,
+    )
+
+
 def test_fetch_deposit_products_returns_raw_result(monkeypatch) -> None:
     """HTTP와 본문 성공 확인 후 원본 result 반환"""
     result = {
@@ -184,6 +210,97 @@ def test_fetch_saving_products_rejects_body_error(monkeypatch) -> None:
     assert response.status_checked is True
 
 
+def test_normalize_saving_products_keeps_reserve_type() -> None:
+    """적금 옵션의 적립 방식과 기간별 금리 보존"""
+    result = {
+        "baseList": [
+            {
+                "dcls_month": "202607",
+                "fin_co_no": "001",
+                "fin_prdt_cd": "SAVING-001",
+                "kor_co_nm": "테스트은행",
+                "fin_prdt_nm": "테스트적금",
+            }
+        ],
+        "optionList": [
+            {
+                "dcls_month": "202607",
+                "fin_co_no": "001",
+                "fin_prdt_cd": "SAVING-001",
+                "save_trm": "12",
+                "intr_rate": 3.2,
+                "intr_rate2": 3.8,
+                "rsrv_type": "F",
+                "rsrv_type_nm": "자유적립식",
+            }
+        ],
+    }
+
+    products = finlife_module.normalize_saving_products(result)
+
+    assert [product.model_dump() for product in products] == [
+        {
+            "product_type": "saving",
+            "disclosure_month": "202607",
+            "company_code": "001",
+            "product_code": "SAVING-001",
+            "company_name": "테스트은행",
+            "product_name": "테스트적금",
+            "term_months": 12,
+            "base_interest_rate": 3.2,
+            "max_interest_rate": 3.8,
+            "reserve_type": "F",
+            "reserve_type_name": "자유적립식",
+        }
+    ]
+
+
+def test_select_saving_products_filters_term_and_sorts_rate() -> None:
+    """적금 기간 필터 뒤 기본금리 우선 후보 선택"""
+    products = [
+        _saving_option(
+            product_code="HIGH",
+            company_name="가은행",
+            product_name="고금리적금",
+            term_months=12,
+            base_interest_rate=4.0,
+            max_interest_rate=4.2,
+            reserve_type="S",
+            reserve_type_name="정액적립식",
+        ),
+        _saving_option(
+            product_code="LOW",
+            company_name="나은행",
+            product_name="낮은금리적금",
+            term_months=12,
+            base_interest_rate=3.0,
+            max_interest_rate=4.5,
+            reserve_type="F",
+            reserve_type_name="자유적립식",
+        ),
+        _saving_option(
+            product_code="OTHER-TERM",
+            company_name="다은행",
+            product_name="6개월적금",
+            term_months=6,
+            base_interest_rate=9.0,
+            max_interest_rate=9.0,
+            reserve_type="S",
+            reserve_type_name="정액적립식",
+        ),
+    ]
+
+    comparison = finlife_module.select_saving_products(
+        products,
+        term_months=12,
+        limit=1,
+    )
+
+    assert comparison.term_months == 12
+    assert comparison.comparison_basis == "base_interest_rate"
+    assert [product.product_code for product in comparison.products] == ["HIGH"]
+
+
 def test_normalize_deposit_products_joins_product_and_rate_option() -> None:
     """세 식별 키가 같은 상품과 기간별 금리 연결"""
     result = {
@@ -212,6 +329,7 @@ def test_normalize_deposit_products_joins_product_and_rate_option() -> None:
 
     assert [product.model_dump() for product in products] == [
         {
+            "product_type": "deposit",
             "disclosure_month": "202607",
             "company_code": "001",
             "product_code": "DEPOSIT-001",
