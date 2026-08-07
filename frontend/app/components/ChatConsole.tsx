@@ -8,6 +8,7 @@ import { EvidencePanel } from "./EvidencePanel";
 import { EvidencePending } from "./EvidencePending";
 import { AlertIcon, ArrowUpIcon, RestartIcon } from "./icons";
 import { AgentResult, Stage, WAITING_MESSAGE, readAgentStream } from "../lib/agent-stream";
+import { createThreadId } from "../lib/thread-id";
 import { getWorkspaceMode } from "../lib/workspace-mode";
 
 const MAX_QUESTION_LENGTH = 500;
@@ -43,7 +44,7 @@ export function ChatConsole() {
   });
 
   // thread id는 hydration 불일치를 피해 마운트 뒤에 생성
-  useEffect(() => setThreadId(crypto.randomUUID()), []);
+  useEffect(() => setThreadId(createThreadId()), []);
 
   // 대화 목록 안에서만 스크롤을 움직여 페이지 스크롤을 끌지 않는다
   useEffect(() => {
@@ -139,7 +140,7 @@ export function ChatConsole() {
 
   function startNewThread() {
     if (isStreaming) return;
-    setThreadId(crypto.randomUUID());
+    setThreadId(createThreadId());
     setTurns([]);
     setDraft("");
     setError("");

@@ -51,6 +51,34 @@ placeholder key는 Compose 해석과 이미지 build에만 사용했으며 외�
 
 ## 다음 수동 확인
 
-실제 `.env`로 Compose를 올려 법령 질문과 Finlife 상품 두 턴을 확인한다. 이후 두
-이미지를 Docker Hub에 발행하고 EC2 최초 index를 만든 뒤 GitHub Actions 자동 배포를
-실행한다.
+실제 `.env`로 Compose를 올려 법령 질문과 Finlife 상품 두 턴을 확인했다. 두 이미지를
+Docker Hub에 발행하고 EC2에서 index를 만든 뒤, 공인 IP의 `:3000`으로 공개 화면과
+다중 턴 응답도 확인했다.
+
+## 실제 EC2 배포에서 추가로 확인한 것
+
+### 맥 이미지와 EC2 CPU가 달랐다
+
+맥에서 일반 `docker compose build`로 올린 이미지는 `linux/arm64`였다. EC2는
+`linux/amd64`라 `no matching manifest` 오류가 났다. 수동 발행은 아래처럼 플랫폼을
+명시해야 했다.
+
+```bash
+docker buildx build --platform linux/amd64 --push ...
+```
+
+GitHub Actions도 같은 문제를 피하도록 두 이미지에 `platforms: linux/amd64`를 이미
+지정했다.
+
+### 공인 IP의 HTTP에서는 대화 ID 생성이 실패했다
+
+`localhost`에서는 되던 `crypto.randomUUID()`가 `http://공인IP:3000`에서는 사용할 수
+없어 화면 전체가 오류가 났다. `localhost`는 예외적으로 안전한 주소로 취급되지만 공인
+IP HTTP는 아니다. `thread-id.ts`에서 UUID를 못 쓸 때 시간과 난수 조합을 만드는 작은
+대체 값을 두었다. 대화 ID는 보안 토큰이 아니라 대화 구분용이므로 이 수준이면 충분하다.
+
+### 자동 배포 전 준비
+
+GitHub Actions Secret에 `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `EC2_HOST`,
+`EC2_USERNAME`, `EC2_SSH_KEY`를 등록했다. EC2를 중지 후 다시 시작하면 공인 IP가
+바뀌므로, 자동 배포 전 `EC2_HOST`도 새 IP로 갱신해야 한다.

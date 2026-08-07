@@ -25,7 +25,9 @@ Ollama는 자동 fallback이 아니므로 배포에서 제외했다. LangFeather
 
 - 완료: Agent 기준 Dockerfile·Compose 재작성과 로컬 이미지 build
 - 완료: GitHub Actions의 테스트·두 이미지 발행·EC2 갱신 설정
-- 다음: 로컬 Agent 두 턴 확인 → Docker Hub 발행 → EC2 최초 준비 → 자동 배포 확인
+- 완료: Docker Hub 수동 발행, Seoul EC2 최초 index 생성, 공인 IP `:3000` 공개 확인
+- 완료: GitHub Actions용 Docker Hub·EC2 Secrets 등록
+- 다음: 현재 HTTP 수정 commit·push로 첫 GitHub Actions 자동 배포 확인
 
 ## 문서 읽는 순서
 
