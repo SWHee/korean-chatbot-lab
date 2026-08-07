@@ -10,6 +10,7 @@ export type Source = {
 };
 
 export type Product = {
+  product_type: "deposit" | "saving";
   disclosure_month: string;
   company_code: string;
   product_code: string;
@@ -18,7 +19,21 @@ export type Product = {
   term_months: number;
   base_interest_rate: number | null;
   max_interest_rate: number | null;
+  reserve_type?: string;
+  reserve_type_name?: string;
 };
+
+/** 후보 상품 유형에 맞춘 근거 패널 제목 */
+export function productHeading(products: Product[]) {
+  if (products.length === 0) return "금융상품 후보";
+  if (products.every((product) => product.product_type === "saving")) {
+    return "적금 후보";
+  }
+  if (products.every((product) => product.product_type === "deposit")) {
+    return "정기예금 후보";
+  }
+  return "금융상품 후보";
+}
 
 export type ToolCall = {
   name: string;

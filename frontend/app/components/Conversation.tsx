@@ -11,7 +11,7 @@ export type Turn = {
 
 const SEED_QUESTIONS = [
   "은행이 파산하면 내 예금은 얼마까지 보호받나요?",
-  "1년 동안 목돈을 맡길 정기예금을 비교해 주세요.",
+  "1년 동안 가입할 예금·적금 상품을 비교해 주세요.",
   "가입 후 마음이 바뀌면 청약을 철회할 수 있나요?",
 ];
 
@@ -35,15 +35,20 @@ export function Conversation({
   if (turns.length === 0) {
     return (
       <div className="opening">
-        <p className="opening-eyebrow">예금자보호법 · 금융소비자보호법</p>
+        <p className="opening-eyebrow">
+          예·적금 상품 비교 · 예금자보호법 · 금융소비자보호법
+        </p>
         <h1>
           금융 질문, <em>근거와 함께</em>
           <br />
           확인하세요.
         </h1>
         <p>
-          예금이 얼마까지 보호되는지, 소비자로서 어떤 권리가 있는지 법령에서 찾아 쉽게
-          설명해 드립니다. 답변 옆에는 근거가 된 조문을 함께 보여 드려요.
+          예금·적금 상품을 비교하고, 예금이 얼마까지 보호되는지,
+          <br className="opening-copy-break" />{" "}
+          소비자로서 어떤 권리가 있는지 법령에서 찾아 쉽게 설명해 드려요.
+          <br className="opening-copy-break" />{" "}
+          답변 옆에는 상품 정보와 근거가 된 조문을 함께 보여 드려요.
         </p>
 
         <div className="seed-list">

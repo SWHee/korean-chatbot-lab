@@ -74,6 +74,53 @@ function BlockView({
     );
   }
 
+  if (block.kind === "table") {
+    const lastRowIndex = block.rows.length - 1;
+    const lastColumnIndex = block.header.length - 1;
+
+    return (
+      <div
+        className="answer-table-region"
+        role="region"
+        aria-label="답변의 비교 표"
+        tabIndex={0}
+      >
+        <table className="answer-table">
+          <thead>
+            <tr>
+              {block.header.map((cell, cellIndex) => (
+                <th
+                  key={cellIndex}
+                  scope="col"
+                  data-align={block.alignments[cellIndex] ?? undefined}
+                >
+                  <InlineParts parts={cell} onHoverSource={onHoverSource} />
+                  {withCaret && block.rows.length === 0 && cellIndex === lastColumnIndex && (
+                    <Caret />
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex} data-align={block.alignments[cellIndex] ?? undefined}>
+                    <InlineParts parts={cell} onHoverSource={onHoverSource} />
+                    {withCaret &&
+                      rowIndex === lastRowIndex &&
+                      cellIndex === lastColumnIndex && <Caret />}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
     <p>
       <InlineParts parts={block.content} onHoverSource={onHoverSource} />

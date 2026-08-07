@@ -512,6 +512,7 @@ button:disabled {
 /* --- 5. 답변 본문 -------------------------------------------------------- */
 
 .answer {
+  min-width: 0;
   font-size: 15.5px;
   line-height: 1.8;
 }
@@ -555,6 +556,72 @@ button:disabled {
 
 .answer strong {
   font-weight: 700;
+}
+
+/* Markdown 비교표 — 좁은 화면에서는 셀을 찌그러뜨리지 않고 가로로 읽는다 */
+.answer-table-region {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.answer-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.55;
+}
+
+.answer-table th,
+.answer-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.answer-table th {
+  background: var(--surface-2);
+  color: var(--fg-muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.answer-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.answer-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.answer-table tbody tr:hover {
+  background: var(--brand-soft);
+}
+
+.answer-table [data-align="center"] {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.answer-table [data-align="right"] {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.answer-table strong {
+  color: var(--brand);
 }
 
 /* 본문 각주 — 오른쪽 근거 카드와 연동 */
@@ -844,50 +911,83 @@ button:disabled {
   letter-spacing: -0.02em;
 }
 
-.rate-rows {
-  display: grid;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.rate-row {
-  display: grid;
-  grid-template-columns: 32px 1fr 54px;
-  align-items: center;
-  gap: var(--space-2);
+.product-detail {
+  margin: var(--space-1) 0 0;
   color: var(--fg-dim);
   font-size: 12px;
 }
 
-.rate-track {
-  height: 6px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  overflow: hidden;
-}
-
-.rate-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: var(--line-strong);
-  transform-origin: left;
-  animation: grow 600ms var(--ease) backwards;
-  animation-delay: calc(var(--i) * 55ms + 120ms);
-}
-
-.rate-row[data-kind="max"] .rate-fill {
-  background: var(--accent);
-}
-
-.rate-value {
-  text-align: right;
-  color: var(--fg);
-  font-size: 13px;
+.rate-axis {
+  display: flex;
+  justify-content: space-between;
+  margin: calc(var(--space-2) * -1) 5px var(--space-2);
+  color: var(--fg-dim);
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
 
-.rate-row[data-kind="max"] .rate-value {
-  color: var(--accent);
+.rate-range {
+  margin-top: var(--space-3);
+}
+
+.rate-track {
+  position: relative;
+  height: 18px;
+  margin: 0 5px;
+}
+
+.rate-track::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.rate-segment {
+  position: absolute;
+  top: 7px;
+  height: 4px;
+  border-radius: 999px;
+  background: #8fb4d3;
+}
+
+.rate-marker {
+  position: absolute;
+  top: 3px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--fg-dim);
+  box-shadow: 0 0 0 1px var(--fg-dim);
+  transform: translateX(-50%);
+}
+
+.rate-marker[data-kind="max"] {
+  background: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand);
+}
+
+.rate-marker[data-kind="same"] {
+  background: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand), 0 0 0 4px var(--brand-soft);
+}
+
+.rate-values {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-values span:last-child {
+  color: var(--brand);
   font-weight: 700;
 }
 
@@ -910,12 +1010,6 @@ button:disabled {
   from {
     opacity: 0;
     transform: translateX(12px);
-  }
-}
-
-@keyframes grow {
-  from {
-    transform: scaleX(0);
   }
 }
 
@@ -1708,6 +1802,10 @@ button:disabled {
 }
 
 @media (max-width: 620px) {
+  .opening-copy-break {
+    display: none;
+  }
+
   .brand-sub {
     display: none;
   }
@@ -1718,10 +1816,6 @@ button:disabled {
 
   .bot-body {
     padding-left: 0;
-  }
-
-  .rate-row {
-    grid-template-columns: 30px 1fr 50px;
   }
 
   .story-section,
