@@ -22,7 +22,7 @@ jobs:
         with:
           version: "0.11.15"
           python-version: "3.13"
-      - run: uv sync --locked
+      - run: uv sync --locked --group evaluation
       - run: uv run pytest
       - uses: actions/setup-node@v6
         with:
