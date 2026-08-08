@@ -150,9 +150,15 @@ def test_lifespan_shuts_down_enabled_langfeather(monkeypatch) -> None:
     assert shutdown_timeouts == [2.0]
 
 
-def test_ask_rag_route_exists() -> None:
-    """Swagger에 RAG 질문 endpoint 노출"""
-    assert "/ask-rag" in main_module.app.openapi()["paths"]
+def test_public_api_keeps_active_and_rag_diagnostic_routes_only() -> None:
+    """현재 서비스와 법령 진단에 필요한 endpoint만 공개"""
+    paths = main_module.app.openapi()["paths"]
+
+    assert "/ask-rag" in paths
+    assert "/ask-agent" in paths
+    assert "/ask-agent/stream" in paths
+    assert "/ask-rag/stream" not in paths
+    assert "/ask-workflow" not in paths
 
 
 def test_ask_rag_returns_answer_sources_and_generation_seconds(monkeypatch) -> None:
@@ -192,181 +198,6 @@ def test_ask_rag_returns_answer_sources_and_generation_seconds(monkeypatch) -> N
     assert response.generation_seconds == 3.0
     assert response.sources[0].law_name == "예금자보호법 시행령"
     assert response.sources[0].article_no == "제18조"
-
-
-def test_ask_rag_stream_route_exists() -> None:
-    """Swagger에 RAG 스트리밍 endpoint 노출"""
-    assert "/ask-rag/stream" in main_module.app.openapi()["paths"]
-
-
-def test_ask_rag_stream_returns_plain_text_tokens() -> None:
-    """RAG Graph의 custom stream을 순수 텍스트로 전송"""
-
-    class FakeRagGraph:
-        def stream(self, input: dict, stream_mode: str):
-            assert input == {
-                "question": "예금은 얼마까지 보호되나요?",
-                "streaming": True,
-            }
-            assert stream_mode == "custom"
-            yield "예금은 "
-            yield "1억원까지 보호됩니다."
-
-    async def collect_body():
-        request = create_rag_request()
-        request.app.state.rag_graph = FakeRagGraph()
-        response = await main_module.ask_rag_stream(
-            main_module.RagRequest(question="예금은 얼마까지 보호되나요?"),
-            request,
-        )
-        chunks = []
-        async for chunk in response.body_iterator:
-            chunks.append(chunk.decode() if isinstance(chunk, bytes) else chunk)
-        return response, "".join(chunks)
-
-    response, body = asyncio.run(collect_body())
-
-    assert response.media_type == "text/plain; charset=utf-8"
-    assert body == "예금은 1억원까지 보호됩니다."
-
-
-def test_prepare_workflow_resources_creates_graph(monkeypatch) -> None:
-    """공유 RAG 자원으로 Routed Workflow Graph 준비"""
-    routed_workflow_graph = object()
-    app = SimpleNamespace(
-        state=SimpleNamespace(
-            generator=FakeGenerator(),
-            encoder=object(),
-            collection=object(),
-            langfeather_enabled=False,
-        )
-    )
-    graph_resources = {}
-
-    monkeypatch.setattr(
-        main_module,
-        "prepare_rag_resources",
-        lambda app: None,
-    )
-
-    def fake_create_routed_workflow_graph(**resources):
-        graph_resources.update(resources)
-        return routed_workflow_graph
-
-    monkeypatch.setattr(
-        main_module,
-        "create_routed_workflow_graph",
-        fake_create_routed_workflow_graph,
-    )
-
-    main_module.prepare_workflow_resources(app)
-
-    assert app.state.routed_workflow_graph is routed_workflow_graph
-    assert graph_resources == {
-        "generator": app.state.generator,
-        "encoder": app.state.encoder,
-        "collection": app.state.collection,
-        "top_k": 5,
-    }
-
-
-def test_ask_workflow_route_exists() -> None:
-    """Swagger에 Routed Workflow endpoint 노출"""
-    assert "/ask-workflow" in main_module.app.openapi()["paths"]
-
-
-def test_ask_workflow_returns_mixed_result(monkeypatch) -> None:
-    """혼합 답변과 route·상태·근거·상품·실행 시간 반환"""
-    times = iter([30.0, 32.5])
-
-    class FakeWorkflowGraph:
-        def invoke(self, input: dict) -> dict:
-            assert input == {
-                "question": "12개월 정기예금과 예금자보호를 알려주세요."
-            }
-            return {
-                "question": input["question"],
-                "route": "mixed",
-                "answer": "법령 안내와 상품 비교 결과입니다.",
-                "law_status": "ok",
-                "product_status": "ok",
-                "articles": [
-                    {
-                        "law_name": "예금자보호법",
-                        "article_no": "제32조",
-                        "effective_date": "20260102",
-                        "similarity": 0.88,
-                        "text": "보험금 지급 기준",
-                    }
-                ],
-                "products": [
-                    {
-                        "disclosure_month": "202607",
-                        "company_code": "001",
-                        "product_code": "DEPOSIT-001",
-                        "company_name": "테스트은행",
-                        "product_name": "테스트예금",
-                        "term_months": 12,
-                        "base_interest_rate": 3.1,
-                        "max_interest_rate": 3.5,
-                    }
-                ],
-            }
-
-    request = create_rag_request()
-    request.app.state.routed_workflow_graph = FakeWorkflowGraph()
-    monkeypatch.setattr(main_module, "perf_counter", lambda: next(times))
-
-    response = asyncio.run(
-        main_module.ask_workflow(
-            main_module.WorkflowRequest(
-                question="12개월 정기예금과 예금자보호를 알려주세요."
-            ),
-            request,
-        )
-    )
-
-    assert response.answer == "법령 안내와 상품 비교 결과입니다."
-    assert response.route == "mixed"
-    assert response.law_status == "ok"
-    assert response.product_status == "ok"
-    assert response.partial_failure is False
-    assert response.execution_seconds == 2.5
-    assert response.sources[0].law_name == "예금자보호법"
-    assert response.products[0].product_name == "테스트예금"
-
-
-def test_ask_workflow_marks_mixed_partial_failure(monkeypatch) -> None:
-    """혼합 경로 한쪽 오류를 부분 실패로 표시"""
-    class FakeWorkflowGraph:
-        def invoke(self, input: dict) -> dict:
-            return {
-                "question": input["question"],
-                "route": "mixed",
-                "answer": "법령은 안내했지만 상품 정보는 불러오지 못했어요.",
-                "law_status": "ok",
-                "product_status": "error",
-                "articles": [],
-                "products": [],
-            }
-
-    request = create_rag_request()
-    request.app.state.routed_workflow_graph = FakeWorkflowGraph()
-
-    response = asyncio.run(
-        main_module.ask_workflow(
-            main_module.WorkflowRequest(
-                question="12개월 정기예금과 예금자보호를 알려주세요."
-            ),
-            request,
-        )
-    )
-
-    assert response.route == "mixed"
-    assert response.law_status == "ok"
-    assert response.product_status == "error"
-    assert response.partial_failure is True
-    assert response.products == []
 
 
 def test_prepare_agent_resources_creates_multi_turn_graph(monkeypatch) -> None:
