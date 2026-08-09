@@ -104,7 +104,12 @@ def test_prepare_rag_resources_creates_graph(monkeypatch) -> None:
     monkeypatch.setattr(main_module, "load_encoder", lambda: encoder)
     monkeypatch.setattr(main_module, "open_collection", lambda: collection)
     monkeypatch.setattr(main_module, "create_rag_graph", fake_create_rag_graph)
-    monkeypatch.delenv("LANGFEATHER_ENABLED", raising=False)
+    monkeypatch.setattr(main_module, "configure_langfeather", lambda: None)
+    monkeypatch.setattr(
+        main_module,
+        "wrap_runnable",
+        lambda runnable, **kwargs: runnable,
+    )
 
     main_module.prepare_rag_resources(app)
 
@@ -117,53 +122,7 @@ def test_prepare_rag_resources_creates_graph(monkeypatch) -> None:
         "collection": collection,
         "top_k": 5,
     }
-    assert app.state.langfeather_enabled is False
-
-
-def test_prepare_rag_resources_wraps_graph_when_langfeather_enabled(
-    monkeypatch,
-) -> None:
-    """환경 변수로 선택한 LangFeather 그래프 추적 연결"""
-    rag_graph = object()
-    traced_graph = object()
-    app = SimpleNamespace(
-        state=SimpleNamespace(
-            generator=FakeGenerator(),
-            encoder=object(),
-            collection=object(),
-        )
-    )
-    configured_endpoints = []
-    wrapped_graphs = []
-    langfeather_sdk = SimpleNamespace()
-
-    monkeypatch.setenv("LANGFEATHER_ENABLED", "true")
-    monkeypatch.setenv("LANGFEATHER_ENDPOINT", "http://127.0.0.1:4319")
-    monkeypatch.setattr(
-        main_module,
-        "create_rag_graph",
-        lambda **resources: rag_graph,
-    )
-    monkeypatch.setattr(
-        main_module,
-        "load_langfeather",
-        lambda: langfeather_sdk,
-    )
-    langfeather_sdk.configure = lambda endpoint: configured_endpoints.append(endpoint)
-
-    def fake_wrap_runnable(runnable, *, name):
-        wrapped_graphs.append((runnable, name))
-        return traced_graph
-
-    langfeather_sdk.wrap_runnable = fake_wrap_runnable
-
-    main_module.prepare_rag_resources(app)
-
-    assert app.state.langfeather_enabled is True
-    assert app.state.langfeather_sdk is langfeather_sdk
-    assert app.state.rag_graph is traced_graph
-    assert configured_endpoints == ["http://127.0.0.1:4319"]
-    assert wrapped_graphs == [(rag_graph, "korean-chatbot-rag")]
+    assert app.state.langfeather_sdk is None
 
 
 def test_lifespan_loads_local_env_before_backend_selection(monkeypatch) -> None:
@@ -197,7 +156,6 @@ def test_lifespan_shuts_down_enabled_langfeather(monkeypatch) -> None:
         state = SimpleNamespace()
         app = SimpleNamespace(state=state)
         async with main_module.lifespan(app):
-            app.state.langfeather_enabled = True
             app.state.langfeather_sdk = SimpleNamespace(
                 shutdown=lambda timeout: shutdown_timeouts.append(timeout) or True
             )
@@ -272,12 +230,17 @@ def test_prepare_agent_resources_creates_multi_turn_graph(monkeypatch) -> None:
             generator=FakeGenerator(),
             encoder=object(),
             collection=object(),
-            langfeather_enabled=False,
+            langfeather_sdk=None,
         )
     )
     captured = {}
 
     monkeypatch.setattr(main_module, "prepare_rag_resources", lambda app: None)
+    monkeypatch.setattr(
+        main_module,
+        "wrap_runnable",
+        lambda runnable, **kwargs: runnable,
+    )
     monkeypatch.setattr(main_module, "create_tool_calling_model", lambda: tool_model)
     monkeypatch.setattr(main_module, "create_agent_tools", lambda **kwargs: tools)
     monkeypatch.setattr(

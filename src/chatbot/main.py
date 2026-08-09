@@ -1,7 +1,6 @@
 """FastAPI 챗봇 API와 생성 backend 수명주기"""
 
 import asyncio
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from time import perf_counter
@@ -30,6 +29,11 @@ from chatbot.api.responses import (
 from chatbot.embedding import load_encoder
 from chatbot.generator_backend import create_generator
 from chatbot.graph import create_rag_graph
+from chatbot.observability.langfeather import (
+    configure_langfeather,
+    shutdown_langfeather,
+    wrap_runnable,
+)
 from chatbot.retriever import DEFAULT_TOP_K
 from chatbot.settings import load_local_env
 from chatbot.vectorstore import open_collection
@@ -37,17 +41,6 @@ from chatbot.vectorstore import open_collection
 LANGFEATHER_TRACE_NAME = "korean-chatbot-rag"
 LANGFEATHER_AGENT_TRACE_NAME = "korean-chatbot-agent"
 LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS = 2.0
-
-
-def load_langfeather():
-    """선택적 로컬 추적 SDK 로드"""
-    try:
-        import langfeather
-    except ModuleNotFoundError as error:
-        raise RuntimeError(
-            "LangFeather 추적에는 'uv sync --group tracing'이 필요합니다."
-        ) from error
-    return langfeather
 
 
 def prepare_rag_resources(app: FastAPI) -> None:
@@ -63,20 +56,12 @@ def prepare_rag_resources(app: FastAPI) -> None:
             collection=app.state.collection,
             top_k=DEFAULT_TOP_K,
         )
-        app.state.langfeather_enabled = (
-            os.getenv("LANGFEATHER_ENABLED", "false").strip().lower() == "true"
+        app.state.langfeather_sdk = configure_langfeather()
+        rag_graph = wrap_runnable(
+            rag_graph,
+            sdk=app.state.langfeather_sdk,
+            name=LANGFEATHER_TRACE_NAME,
         )
-        if app.state.langfeather_enabled:
-            langfeather_sdk = load_langfeather()
-            langfeather_sdk.configure(
-                endpoint=os.getenv("LANGFEATHER_ENDPOINT") or None,
-            )
-            # 그래프를 LangFeather 추적 가능한 Runnable로 래핑
-            rag_graph = langfeather_sdk.wrap_runnable(
-                rag_graph,
-                name=LANGFEATHER_TRACE_NAME,
-            )
-            app.state.langfeather_sdk = langfeather_sdk
         app.state.rag_graph = rag_graph
 
 
@@ -97,11 +82,11 @@ def prepare_agent_resources(app: FastAPI) -> None:
         analyze_turn=create_turn_analyzer(generator=app.state.generator),
         checkpointer=agent_checkpointer,
     )
-    if app.state.langfeather_enabled:
-        agent_graph = app.state.langfeather_sdk.wrap_runnable(
-            agent_graph,
-            name=LANGFEATHER_AGENT_TRACE_NAME,
-        )
+    agent_graph = wrap_runnable(
+        agent_graph,
+        sdk=app.state.langfeather_sdk,
+        name=LANGFEATHER_AGENT_TRACE_NAME,
+    )
     app.state.agent_checkpointer = agent_checkpointer
     app.state.agent_graph = agent_graph
 
@@ -114,12 +99,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        langfeather_sdk = getattr(app.state, "langfeather_sdk", None)
-        if getattr(app.state, "langfeather_enabled", False) and langfeather_sdk:
-            await asyncio.to_thread(
-                langfeather_sdk.shutdown,
-                timeout=LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS,
-            )
+        await asyncio.to_thread(
+            shutdown_langfeather,
+            getattr(app.state, "langfeather_sdk", None),
+            timeout_seconds=LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS,
+        )
         agent_checkpointer = getattr(app.state, "agent_checkpointer", None)
         if agent_checkpointer:
             agent_checkpointer.conn.close()
@@ -130,7 +114,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             "rag_graph",
             "agent_graph",
             "agent_checkpointer",
-            "langfeather_enabled",
             "langfeather_sdk",
         ):
             if hasattr(app.state, name):
