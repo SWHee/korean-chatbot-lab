@@ -51,6 +51,13 @@
 
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
   --evidence-width: 380px;
+  --desktop-content-max: 1560px;
+  --desktop-story-max: 1120px;
+  --desktop-hero-max: 1200px;
+  --desktop-copy-max: 720px;
+  --desktop-hero-title-max: 54px;
+  --desktop-story-title-max: 40px;
+  --desktop-chat-title-max: 32px;
 }
 
 /* --- 2. 리셋 ------------------------------------------------------------ */
@@ -174,7 +181,7 @@ button:disabled {
   grid-template-rows: auto 1fr auto;
   height: clamp(620px, calc(100dvh - 156px), 940px);
   width: 100%;
-  max-width: 1560px;
+  max-width: var(--desktop-content-max);
   margin: 0 auto;
   overflow: hidden;
   border: 1px solid rgba(199, 214, 227, 0.72);
@@ -326,7 +333,7 @@ button:disabled {
 }
 
 .transcript-inner {
-  max-width: 720px;
+  max-width: var(--desktop-copy-max);
   margin: 0 auto;
 }
 
@@ -663,7 +670,7 @@ button:disabled {
 }
 
 .composer {
-  max-width: 720px;
+  max-width: var(--desktop-copy-max);
   margin: 0 auto;
   padding: var(--space-2);
   display: grid;
@@ -725,7 +732,7 @@ button:disabled {
 .composer-hint {
   display: flex;
   justify-content: space-between;
-  max-width: 720px;
+  max-width: var(--desktop-copy-max);
   margin: var(--space-2) auto 0;
   color: var(--fg-dim);
   font-size: 12.5px;
@@ -1157,7 +1164,7 @@ button:disabled {
 
 .story-inner {
   width: 100%;
-  max-width: 1120px;
+  max-width: var(--desktop-story-max);
 }
 
 /* 화면에 고정되는 장면 — 부모의 높이가 그대로 스크롤 길이가 된다 */
@@ -1204,7 +1211,7 @@ button:disabled {
   grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
   align-items: center;
   gap: clamp(32px, 6vw, 88px);
-  max-width: 1200px;
+  max-width: var(--desktop-hero-max);
 }
 
 .hero-copy {
@@ -1214,7 +1221,7 @@ button:disabled {
 
 .hero h1 {
   margin-top: var(--space-4);
-  font-size: clamp(28px, 4.6vw, 54px);
+  font-size: clamp(28px, 4.6vw, var(--desktop-hero-title-max));
   font-weight: 700;
   line-height: 1.32;
   letter-spacing: -0.035em;
@@ -1362,7 +1369,7 @@ button:disabled {
 
 .story-scene h2 {
   margin-top: var(--space-3);
-  font-size: clamp(24px, 3.4vw, 40px);
+  font-size: clamp(24px, 3.4vw, var(--desktop-story-title-max));
   font-weight: 700;
   line-height: 1.34;
   letter-spacing: -0.035em;
@@ -1713,12 +1720,12 @@ button:disabled {
 
 .chat-intro {
   width: 100%;
-  max-width: 1560px;
+  max-width: var(--desktop-content-max);
   margin: 0 auto;
 }
 
 .chat-intro h2 {
-  font-size: clamp(23px, 2.8vw, 32px);
+  font-size: clamp(23px, 2.8vw, var(--desktop-chat-title-max));
   font-weight: 700;
   letter-spacing: -0.03em;
 }
@@ -1736,6 +1743,168 @@ button:disabled {
 }
 
 /* --- 반응형 ------------------------------------------------------------- */
+
+/* 브라우저 100%에서도 기존 90% 화면과 비슷한 밀도를 만드는 데스크톱 규칙 */
+@media (min-width: 1001px) {
+  :root {
+    --space-2: 7px;
+    --space-3: 11px;
+    --space-4: 14px;
+    --space-5: 22px;
+    --space-6: 29px;
+    --evidence-width: 342px;
+    --desktop-content-max: 1404px;
+    --desktop-story-max: 1008px;
+    --desktop-hero-max: 1080px;
+    --desktop-copy-max: 648px;
+    --desktop-hero-title-max: 49px;
+    --desktop-story-title-max: 36px;
+    --desktop-chat-title-max: 29px;
+  }
+
+  .chat-app {
+    border-radius: 22px;
+  }
+
+  .brand-mark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .brand-name {
+    font-size: 15.5px;
+  }
+
+  .brand-sub,
+  .opening-eyebrow,
+  .scene-label,
+  .scroll-cue {
+    font-size: 12px;
+  }
+
+  .ghost-button {
+    min-height: 36px;
+    font-size: 13px;
+  }
+
+  .disclaimer {
+    font-size: 12px;
+  }
+
+  .opening h1 {
+    font-size: clamp(25px, 3vw, 31px);
+  }
+
+  .opening p,
+  .seed,
+  .chat-intro p {
+    font-size: 14px;
+  }
+
+  .seed {
+    min-height: 50px;
+  }
+
+  .seed-index {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+  }
+
+  .user-card,
+  .answer {
+    font-size: 14.5px;
+  }
+
+  .answer h3 {
+    font-size: 15.5px;
+  }
+
+  .answer h4 {
+    font-size: 13.5px;
+  }
+
+  .bot-avatar {
+    width: 30px;
+    height: 30px;
+  }
+
+  .bot-body {
+    padding-left: 38px;
+  }
+
+  .hero .story-inner {
+    grid-template-columns: minmax(0, 1.08fr) minmax(324px, 0.92fr);
+    gap: clamp(29px, 5.4vw, 79px);
+  }
+
+  .hero-lede {
+    font-size: clamp(14px, 1.35vw, 16px);
+  }
+
+  .hero-visual {
+    min-height: clamp(378px, 55vh, 558px);
+  }
+
+  .hero-visual::before {
+    width: min(90%, 423px);
+  }
+
+  .hero-character {
+    width: min(112%, 531px);
+  }
+
+  .hero-orbit-outer {
+    width: min(94%, 450px);
+  }
+
+  .hero-orbit-inner {
+    width: min(72%, 342px);
+  }
+
+  .hero-primary {
+    min-height: 44px;
+    padding: 0 18px;
+    font-size: 14px;
+  }
+
+  .story-journey {
+    grid-template-columns: minmax(0, 0.9fr) minmax(378px, 1.1fr);
+    gap: clamp(36px, 6.3vw, 86px);
+  }
+
+  .journey-copy {
+    max-width: 423px;
+  }
+
+  .journey-lede {
+    font-size: 14.5px;
+  }
+
+  .journey-stepper {
+    margin-top: 32px;
+  }
+
+  .journey-visual {
+    min-height: clamp(351px, 49vh, 459px);
+    border-radius: 22px;
+  }
+
+  .journey-document {
+    width: min(171px, 35%);
+    padding: 13px 14px;
+  }
+
+  .journey-core {
+    width: 128px;
+    height: 128px;
+  }
+
+  .journey-answer-card {
+    width: min(223px, 48%);
+    padding: 14px;
+  }
+}
 
 @media (max-width: 1240px) {
   :root {
