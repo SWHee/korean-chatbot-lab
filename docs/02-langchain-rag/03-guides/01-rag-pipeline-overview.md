@@ -83,7 +83,6 @@ FastAPI가 검색 결과와 측정값으로 직접 구성한다.
 | 파일 | 역할 |
 | --- | --- |
 | `scripts/verify_index.py` | 저장된 Chroma 검색 결과가 기준 검색 결과와 맞는지 확인 |
-| `scripts/compare_embeddings.py` | 임베딩 모델 후보 비교용 실험 스크립트 |
 
 Chroma 인덱스는 `data/index/` 아래에 만들어진다. 이 파일들은 코드로 다시 만들 수
 있는 파생물이므로 Git에 올리지 않는다.

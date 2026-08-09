@@ -55,7 +55,7 @@ Experiment는 LangSmith 웹에 남는다.
 | 개념 | 현재 프로젝트 |
 | --- | --- |
 | Dataset | `rag-v1-dev.jsonl`의 24문항 |
-| Target | KURE·Chroma·Ollama RAG를 실행하는 `run_rag_evaluation()` |
+| Target | 현재 법령 RAG Graph를 실행하는 `create_graph_evaluation_target()` |
 | Evaluator | 조문 검색 Precision·Recall, Gemini Faithfulness |
 | Experiment | Dataset을 현재 RAG로 실행한 한 번의 결과 묶음 |
 

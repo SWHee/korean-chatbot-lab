@@ -28,7 +28,7 @@ LangGraph를 먼저 구현하면 답변 변화가 기존 RAG의 한계인지, �
 | 평가 질문 확정 | `02-rag-questions.md` | 완료 |
 | 로컬 Dataset 작성 | `data/evaluation/rag-v1-dev.jsonl` 24문항 | 완료 |
 | LangSmith Dataset 등록 | `korean-chatbot-rag-v1-dev` | 완료 |
-| 평가용 RAG 함수 연결 | `run_rag_evaluation()` | 완료 |
+| 평가용 LangGraph target 연결 | `create_graph_evaluation_target()` | 완료 |
 | 검색 evaluator 연결 | `precision_top_5`, `recall_top_5` | 완료 |
 | 답변 evaluator 연결 | Gemini 3.5 Flash Faithfulness | 완료 |
 | LangChain v1 기준선 | 단일 Experiment 24문항 | 완료 |

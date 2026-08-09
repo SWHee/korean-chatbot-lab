@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda
 from pydantic import BaseModel, ConfigDict, Field
 
-from chatbot.rag.retrieval import DEFAULT_TOP_K, retrieve_articles
+from chatbot.rag.retrieval import DEFAULT_TOP_K
 
 
 INSUFFICIENT_EVIDENCE_MESSAGE = (
@@ -253,23 +253,3 @@ def stream_answer_question(
     if remaining_text:
         yield remaining_text
 
-
-def answer_with_retrieval(
-    generator,
-    encoder,
-    collection,
-    question: str,
-    top_k: int = DEFAULT_TOP_K,
-) -> str:
-    """검색과 답변 생성을 연결한 RAG 실행"""
-    articles = retrieve_articles(
-        encoder=encoder,
-        collection=collection,
-        question=question,
-        top_k=top_k,
-    )
-    return answer_question(
-        generator=generator,
-        question=question,
-        articles=articles,
-    )

@@ -29,9 +29,9 @@ retrieval 평가에서 제외했다.
 - Recall@k: 필요한 정답 조문 중 상위 k개에서 찾은 비율
 - MRR: 첫 정답 조문 순위의 역수 평균
 
-모델별 prefix와 query prompt 규칙을 적용하고 모든 벡터를 정규화했다. 전체
-재현 코드는 [`compare_embeddings.py`](../../../scripts/compare_embeddings.py)에
-있다.
+모델별 prefix와 query prompt 규칙을 적용하고 모든 벡터를 정규화했다. 후보 선정에
+사용한 일회성 비교 코드는 이후 인덱싱 구조를 다시 설계하면서 제거했고, 당시 조건과
+수치는 이 문서에 보존했다.
 
 이 결과는 세션⑤ 당시의 초기 정답 조문을 사용한다. 이후 만든 Dataset v1은 A2·A6·C2의
 필수 조문을 확장했으므로, Dataset v1으로 계산한 수치와 직접 비교하지 않는다.

@@ -246,51 +246,6 @@ def test_render_rag_answer_falls_back_for_unknown_source_id() -> None:
     assert rendered == rag_module.INSUFFICIENT_EVIDENCE_MESSAGE
 
 
-def test_answer_with_retrieval_searches_articles_then_answers(monkeypatch) -> None:
-    """질문 검색 결과로 RAG 답변 생성"""
-    generator = FakeGenerator()
-    calls = {}
-
-    def fake_retrieve_articles(encoder, collection, question, top_k):
-        calls["encoder"] = encoder
-        calls["collection"] = collection
-        calls["question"] = question
-        calls["top_k"] = top_k
-        return [
-            {
-                "law_name": "예금자보호법 시행령",
-                "article_no": "제18조",
-                "effective_date": "20250901",
-                "text": "보험금 한도는 1억원",
-            }
-        ]
-
-    monkeypatch.setattr(rag_module, "retrieve_articles", fake_retrieve_articles)
-
-    encoder = object()
-    collection = object()
-    answer = rag_module.answer_with_retrieval(
-        generator,
-        encoder,
-        collection,
-        "예금은 얼마까지 보호되나요?",
-        top_k=3,
-    )
-
-    assert answer == (
-        "예금은 관련 법령에 따라 보호됩니다.\n\n"
-        "확인한 법령 근거\n"
-        "- 예금자보호법 시행령 제18조 (시행일: 20250901)"
-    )
-    assert calls == {
-        "encoder": encoder,
-        "collection": collection,
-        "question": "예금은 얼마까지 보호되나요?",
-        "top_k": 3,
-    }
-    assert "보험금 한도는 1억원" in generator.messages[0][1]["content"]
-
-
 def test_stream_answer_question_yields_answer_chunks_and_validated_source() -> None:
     """구조화 답변 본문 조각과 검증된 출처 순차 전달"""
     generator = FakeGenerator()

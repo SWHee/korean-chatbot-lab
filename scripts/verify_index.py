@@ -1,14 +1,44 @@
 """Chroma 검색 결과와 브루트포스 정확 검색의 일치 검증 (ADR 0006 근거).
 
 사용법: uv run python scripts/verify_index.py
-평가 질문 15개에서 조문 단위 top-5가 일치하는지 확인한다.
+현재 RAG Dataset의 검색 평가 대상 문항에서 조문 단위 top-5를 확인한다.
 """
 
-import torch
-from compare_embeddings import ANSWER_ARTICLE_VERSION, QUESTIONS
+import json
+from pathlib import Path
 
+import torch
+
+from chatbot.evaluation.rag_dataset import DATASET_VERSION
 from chatbot.law.embedding import load_encoder
 from chatbot.law.vectorstore import open_collection, search
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATASET_PATH = PROJECT_ROOT / "data" / "evaluation" / "rag-v1-dev.jsonl"
+
+
+def load_retrieval_cases(
+    path: Path = DATASET_PATH,
+) -> list[tuple[str, str, set[tuple[str, str]]]]:
+    """현재 RAG Dataset의 검색 평가 대상 질문과 필수 조문"""
+    rows = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    return [
+        (
+            row["id"],
+            row["question"],
+            {
+                (article["law_name"], article["article_no"])
+                for article in row["required_articles"]
+            },
+        )
+        for row in rows
+        if row["retrieval_eligible"]
+    ]
 
 
 def article_top5(scores: dict) -> list:
@@ -17,7 +47,8 @@ def article_top5(scores: dict) -> list:
 
 
 def main() -> None:
-    print("정답 조문 버전:", ANSWER_ARTICLE_VERSION)
+    cases = load_retrieval_cases()
+    print("검색 평가 Dataset:", DATASET_VERSION)
     collection = open_collection()
     print("컬렉션 청크 수:", collection.count())
 
@@ -27,13 +58,13 @@ def main() -> None:
 
     encoder = load_encoder()
     query_embeddings = torch.tensor(
-        encoder.encode([q for _, q, _ in QUESTIONS], batch_size=16,
+        encoder.encode([q for _, q, _ in cases], batch_size=16,
                        normalize_embeddings=True)
     )
 
     mismatch = 0
     answer_hit5 = 0
-    for qi, (qid, _, answer_articles) in enumerate(QUESTIONS):
+    for qi, (qid, _, answer_articles) in enumerate(cases):
         sims = query_embeddings[qi] @ embeddings.T
         brute = {}
         for ci, key in enumerate(keys):
@@ -54,7 +85,7 @@ def main() -> None:
             print(f"{qid} 불일치!\n  브루트포스: {bf5}\n  Chroma:    {ch5}")
         answer_hit5 += bool(set(ch5) & answer_articles)
 
-    total = len(QUESTIONS)
+    total = len(cases)
     print(f"top-5 조문 완전 일치: {total - mismatch}/{total}")
     print(f"Chroma 기준 Hit@5: {answer_hit5}/{total}")
 
