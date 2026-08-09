@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+from chatbot.api.models import AgentRequest
+from chatbot.api.responses import build_agent_response
 import chatbot.main as main_module
 
 
@@ -27,6 +29,64 @@ def create_rag_request() -> SimpleNamespace:
     )
     app = SimpleNamespace(state=state)
     return SimpleNamespace(app=app)
+
+
+def test_api_response_module_builds_saving_product_result() -> None:
+    """분리된 API 응답 모듈의 적금 필드 보존"""
+    graph_result = {
+        "route": "ready",
+        "product_preferences": {"product_type": "saving", "term_months": 12},
+        "missing_fields": [],
+        "messages": [
+            HumanMessage(content="12개월 적금 후보를 알려주세요."),
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "search_financial_products",
+                        "args": {"product_type": "saving", "term_months": 12},
+                        "id": "saving-1",
+                        "type": "tool_call",
+                    }
+                ],
+            ),
+            ToolMessage(
+                content=json.dumps(
+                    {
+                        "status": "ok",
+                        "products": [
+                            {
+                                "product_type": "saving",
+                                "disclosure_month": "202607",
+                                "company_code": "001",
+                                "product_code": "SAVING-001",
+                                "company_name": "테스트은행",
+                                "product_name": "테스트적금",
+                                "term_months": 12,
+                                "base_interest_rate": 3.1,
+                                "max_interest_rate": 3.5,
+                                "reserve_type": "F",
+                                "reserve_type_name": "자유적립식",
+                            }
+                        ],
+                    }
+                ),
+                tool_call_id="saving-1",
+                name="search_financial_products",
+            ),
+            AIMessage(content="적금 후보를 확인했어요."),
+        ],
+    }
+
+    response = build_agent_response(
+        thread_id=AgentRequest(thread_id="thread-saving", message="적금").thread_id,
+        graph_result=graph_result,
+        execution_seconds=1.2,
+    )
+
+    assert response.thread_id == "thread-saving"
+    assert response.products[0].product_type == "saving"
+    assert response.products[0].reserve_type_name == "자유적립식"
 
 
 def test_prepare_rag_resources_creates_graph(monkeypatch) -> None:

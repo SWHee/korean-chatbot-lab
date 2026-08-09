@@ -1,7 +1,6 @@
 """FastAPI 챗봇 API와 생성 backend 수명주기"""
 
 import asyncio
-import json
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -9,16 +8,26 @@ from time import perf_counter
 
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from pydantic import BaseModel, Field, TypeAdapter
+from langchain_core.messages import HumanMessage
 
 from chatbot.agent.checkpoint import create_sqlite_checkpointer
 from chatbot.agent.graph import create_multi_turn_agent_graph
 from chatbot.agent.model import create_tool_calling_model
 from chatbot.agent.tools import create_agent_tools
 from chatbot.agent.turn_analysis import create_turn_analyzer
+from chatbot.api.models import (
+    AgentRequest,
+    AgentResponse,
+    RagRequest,
+    RagResponse,
+    RagSource,
+)
+from chatbot.api.responses import (
+    build_agent_response as _agent_response,
+    extract_agent_execution_details as _agent_execution_details,
+    format_sse_event as _sse_event,
+)
 from chatbot.embedding import load_encoder
-from chatbot.finlife import FinancialProductOption
 from chatbot.generator_backend import create_generator
 from chatbot.graph import create_rag_graph
 from chatbot.retriever import DEFAULT_TOP_K
@@ -28,7 +37,6 @@ from chatbot.vectorstore import open_collection
 LANGFEATHER_TRACE_NAME = "korean-chatbot-rag"
 LANGFEATHER_AGENT_TRACE_NAME = "korean-chatbot-agent"
 LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS = 2.0
-FINANCIAL_PRODUCT_OPTION_ADAPTER = TypeAdapter(FinancialProductOption)
 
 
 def load_langfeather():
@@ -40,67 +48,6 @@ def load_langfeather():
             "LangFeather 추적에는 'uv sync --group tracing'이 필요합니다."
         ) from error
     return langfeather
-
-
-class RagRequest(BaseModel):
-    """법령 RAG에 전달할 사용자 질문 검증"""
-
-    question: str = Field(min_length=1)
-
-
-class RagSource(BaseModel):
-    """RAG 답변에 사용한 법령 근거"""
-
-    law_name: str
-    article_no: str
-    effective_date: str
-    similarity: float
-
-
-class RagResponse(BaseModel):
-    """법령 RAG 답변과 검색 근거 형식 정의"""
-
-    response: str
-    sources: list[RagSource]
-    generation_seconds: float
-
-
-class AgentRequest(BaseModel):
-    """멀티턴 Agent에 전달할 thread와 현재 사용자 메시지"""
-
-    thread_id: str = Field(min_length=1)
-    message: str = Field(min_length=1)
-
-
-class AgentSource(BaseModel):
-    """Agent 법령 Tool이 반환한 인용 근거"""
-
-    source_id: str
-    law_name: str
-    article_no: str
-    effective_date: str
-
-
-class AgentToolResult(BaseModel):
-    """한 번의 Agent Tool 호출과 결과 상태"""
-
-    name: str
-    arguments: dict[str, object]
-    status: str | None = None
-
-
-class AgentResponse(BaseModel):
-    """멀티턴 Agent의 답변과 실행 요약"""
-
-    thread_id: str
-    answer: str
-    route: str
-    product_preferences: dict[str, object] = Field(default_factory=dict)
-    missing_fields: list[str] = Field(default_factory=list)
-    tools: list[AgentToolResult]
-    sources: list[AgentSource]
-    products: list[FinancialProductOption]
-    execution_seconds: float
 
 
 def prepare_rag_resources(app: FastAPI) -> None:
@@ -157,83 +104,6 @@ def prepare_agent_resources(app: FastAPI) -> None:
         )
     app.state.agent_checkpointer = agent_checkpointer
     app.state.agent_graph = agent_graph
-
-
-def _agent_execution_details(
-    messages: list,
-) -> tuple[list[AgentToolResult], list[AgentSource], list[FinancialProductOption]]:
-    """Agent 메시지 누적값을 API용 Tool·근거·상품 목록으로 변환"""
-    latest_human_index = max(
-        index
-        for index, message in enumerate(messages)
-        if isinstance(message, HumanMessage)
-    )
-    current_turn_messages = messages[latest_human_index + 1 :]
-    calls_by_id = {
-        call["id"]: call
-        for message in current_turn_messages
-        if isinstance(message, AIMessage)
-        for call in message.tool_calls
-    }
-    tools = []
-    sources = []
-    products = []
-
-    for message in current_turn_messages:
-        if not isinstance(message, ToolMessage):
-            continue
-        tool_call = calls_by_id.get(message.tool_call_id, {})
-        try:
-            result = json.loads(message.content)
-        except (TypeError, json.JSONDecodeError):
-            result = {}
-        tools.append(
-            AgentToolResult(
-                name=message.name or tool_call.get("name", "unknown"),
-                arguments=tool_call.get("args", {}),
-                status=result.get("status"),
-            )
-        )
-        sources.extend(
-            AgentSource.model_validate(article)
-            for article in result.get("articles", [])
-        )
-        product_type = tool_call.get("args", {}).get("product_type", "deposit")
-        products.extend(
-            FINANCIAL_PRODUCT_OPTION_ADAPTER.validate_python(
-                {"product_type": product_type, **product}
-            )
-            for product in result.get("products", [])
-        )
-
-    return tools, sources, products
-
-
-def _agent_response(
-    *,
-    thread_id: str,
-    graph_result: dict,
-    execution_seconds: float,
-) -> AgentResponse:
-    """완료된 Agent Graph 상태를 API 응답 모델로 변환"""
-    messages = graph_result["messages"]
-    tools, sources, products = _agent_execution_details(messages)
-    return AgentResponse(
-        thread_id=thread_id,
-        answer=messages[-1].text,
-        route=graph_result["route"],
-        product_preferences=graph_result.get("product_preferences", {}),
-        missing_fields=graph_result.get("missing_fields", []),
-        tools=tools,
-        sources=sources,
-        products=products,
-        execution_seconds=execution_seconds,
-    )
-
-
-def _sse_event(*, event: str, data: dict) -> str:
-    """SSE event와 JSON data 한 묶음 생성"""
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 @asynccontextmanager
