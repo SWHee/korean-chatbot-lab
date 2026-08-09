@@ -4,8 +4,12 @@ from types import SimpleNamespace
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from chatbot.api.models import AgentRequest
-from chatbot.api.responses import build_agent_response
+from chatbot.api.models import AgentRequest, RagRequest
+from chatbot.api.responses import (
+    build_agent_response,
+    extract_agent_execution_details,
+)
+import chatbot.api.routes as routes_module
 import chatbot.main as main_module
 
 
@@ -124,11 +128,11 @@ def test_ask_rag_returns_answer_sources_and_generation_seconds(monkeypatch) -> N
 
     request = create_rag_request()
     request.app.state.rag_graph = FakeRagGraph()
-    monkeypatch.setattr(main_module, "perf_counter", lambda: next(times))
+    monkeypatch.setattr(routes_module, "perf_counter", lambda: next(times))
 
     response = asyncio.run(
-        main_module.ask_rag(
-            main_module.RagRequest(question="예금은 얼마까지 보호되나요?"),
+        routes_module.ask_rag(
+            RagRequest(question="예금은 얼마까지 보호되나요?"),
             request,
         )
     )
@@ -235,11 +239,11 @@ def test_ask_agent_returns_thread_tools_sources_and_products(monkeypatch) -> Non
 
     request = create_rag_request()
     request.app.state.agent_graph = FakeAgentGraph()
-    monkeypatch.setattr(main_module, "perf_counter", lambda: next(times))
+    monkeypatch.setattr(routes_module, "perf_counter", lambda: next(times))
 
     response = asyncio.run(
-        main_module.ask_agent(
-            main_module.AgentRequest(
+        routes_module.ask_agent(
+            AgentRequest(
                 thread_id="thread-1",
                 message="12개월 정기예금과 예금자보호를 알려주세요.",
             ),
@@ -302,7 +306,7 @@ def test_agent_execution_details_preserves_saving_product_fields() -> None:
         ),
     ]
 
-    tools, sources, products = main_module._agent_execution_details(messages)
+    tools, sources, products = extract_agent_execution_details(messages)
 
     assert tools[0].status == "ok"
     assert sources == []
@@ -333,8 +337,8 @@ def test_ask_agent_returns_clarifying_question_without_tools() -> None:
     request.app.state.agent_graph = FakeAgentGraph()
 
     response = asyncio.run(
-        main_module.ask_agent(
-            main_module.AgentRequest(
+        routes_module.ask_agent(
+            AgentRequest(
                 thread_id="thread-clarify",
                 message="금융상품 추천해 주세요.",
             ),
@@ -378,8 +382,8 @@ def test_ask_agent_stream_returns_status_token_and_result_events() -> None:
     async def collect_body():
         request = create_rag_request()
         request.app.state.agent_graph = FakeAgentGraph()
-        response = await main_module.ask_agent_stream(
-            main_module.AgentRequest(thread_id="thread-stream", message="안녕하세요."),
+        response = await routes_module.ask_agent_stream(
+            AgentRequest(thread_id="thread-stream", message="안녕하세요."),
             request,
         )
         chunks = []
