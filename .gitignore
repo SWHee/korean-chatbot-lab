@@ -16,5 +16,8 @@
 # Local Graphify output
 /graphify-out/
 
+# Local AI audit notes
+/docs/100-claude-advisor/
+
 # Local LangGraph checkpoints
 /.runtime/
