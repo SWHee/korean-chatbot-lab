@@ -1,14 +1,13 @@
 """FastAPI 챗봇 API와 생성 backend 수명주기"""
 
 import asyncio
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from time import perf_counter
 
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
+from chatbot.api.lifecycle import lifespan
 from chatbot.api.models import (
     AgentRequest,
     AgentResponse,
@@ -22,40 +21,6 @@ from chatbot.api.responses import (
     format_sse_event as _sse_event,
 )
 from chatbot.api.resources import prepare_agent_resources, prepare_rag_resources
-from chatbot.generator_backend import create_generator
-from chatbot.observability.langfeather import shutdown_langfeather
-from chatbot.settings import load_local_env
-
-LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS = 2.0
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """서버 시작 시 선택한 backend의 생성기를 준비하고 종료 시 해제"""
-    load_local_env()
-    app.state.generator = create_generator()
-    try:
-        yield
-    finally:
-        await asyncio.to_thread(
-            shutdown_langfeather,
-            getattr(app.state, "langfeather_sdk", None),
-            timeout_seconds=LANGFEATHER_SHUTDOWN_TIMEOUT_SECONDS,
-        )
-        agent_checkpointer = getattr(app.state, "agent_checkpointer", None)
-        if agent_checkpointer:
-            agent_checkpointer.conn.close()
-        for name in (
-            "generator",
-            "encoder",
-            "collection",
-            "rag_graph",
-            "agent_graph",
-            "agent_checkpointer",
-            "langfeather_sdk",
-        ):
-            if hasattr(app.state, name):
-                delattr(app.state, name)
 
 
 app = FastAPI(
