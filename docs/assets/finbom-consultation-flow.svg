@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 620" role="img" aria-labelledby="title desc">
   <title id="title">Finbom consultation flow</title>
-  <desc id="desc">A user question moves through the Next.js chat, FastAPI, and the LangGraph agent. The agent retrieves Korean law and Finlife disclosure data, then streams an answer with its sources.</desc>
+  <desc id="desc">A user question moves through the Next.js chat, FastAPI, and the LangGraph agent. The agent retrieves Korean law with hybrid search and compares Finlife deposit or installment-savings disclosures, then streams an answer with its sources.</desc>
 
   <defs>
     <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
@@ -54,7 +54,7 @@
     <text x="84" y="266" class="step">01 · ASK</text>
     <text x="84" y="311" class="card-title">User question</text>
     <text x="84" y="343" class="card-copy">Law, protection,</text>
-    <text x="84" y="367" class="card-copy">or deposit terms</text>
+    <text x="84" y="367" class="card-copy">or product terms</text>
 
     <text x="344" y="266" class="step">02 · CHAT</text>
     <text x="344" y="311" class="card-title">Next.js UI</text>
@@ -74,9 +74,9 @@
     <text x="1124" y="266" class="step">05 · RETRIEVE</text>
     <text x="1124" y="311" class="card-title">Evidence tools</text>
     <rect x="1124" y="331" width="152" height="28" rx="14" fill="#1B2A40"/>
-    <text x="1200" y="350" text-anchor="middle" class="chip">Korean law</text>
+    <text x="1200" y="350" text-anchor="middle" class="chip">Law · Dense + BM25</text>
     <rect x="1124" y="367" width="152" height="28" rx="14" fill="#1B2A40"/>
-    <text x="1200" y="386" text-anchor="middle" class="chip">Finlife disclosure</text>
+    <text x="1200" y="386" text-anchor="middle" class="chip">Finlife · deposits/savings</text>
 
     <text x="1384" y="266" class="step">06 · ANSWER</text>
     <text x="1384" y="311" class="card-title">Answer</text>

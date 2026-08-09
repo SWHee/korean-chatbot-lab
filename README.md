@@ -1,16 +1,6 @@
-<!--
 <p align="center">
-  <img
-    src="docs/assets/readme-hero-finbom.png"
-    alt="근거 연결망과 금융 문서 사이에서 안내하는 핀봄 상담 마스코트 포키"
-    width="100%"
-  />
-</p>
--->
-
-<p align="center">
-  <img width="1280" width="100%"
-    alt="Image"
+  <img width="100%"
+    alt="금융 질문과 근거를 연결하는 핀봄 상담 화면과 마스코트 포키"
     src="https://github.com/user-attachments/assets/595c2145-4a2c-48f8-9661-accb862e3bec"
   />
 </p>
@@ -46,9 +36,9 @@
 <p align="center">
   <a href="#근거를-먼저-보여주는-금융-상담">소개</a> ·
   <a href="#현재-지원하는-상담">지원 기능</a> ·
-  <a href="#상담-처리-흐름">처리 흐름</a> ·
+  <a href="#핀봄의-작동-방식">작동 방식</a> ·
   <a href="#실행하기">실행</a> ·
-  <a href="#데이터-출처와-검색-근거">데이터</a> ·
+  <a href="#데이터와-검증-근거">데이터·검증</a> ·
   <a href="docs/README.md">개발 문서</a>
 </p>
 
@@ -81,19 +71,25 @@
 - **답변과 근거 분리 표시** — 답변을 스트리밍하고, 사용한 법령과 금융상품 정보를 별도
   영역에서 확인할 수 있습니다.
 
+## 핀봄의 작동 방식
 
-## 상담 처리 흐름
+### 시스템 요청 흐름
 
 ![사용자 질문이 Next.js, FastAPI와 LangGraph 에이전트를 거쳐 법령·금융상품 근거가 포함된 답변으로 이어지는 흐름](docs/assets/finbom-consultation-flow.svg)
 
-핀봄은 먼저 현재 질문과 이전 상담 조건을 분석합니다. 정보가 부족하면 추가 조건을
-묻고, 지원하지 않는 질문에는 상담 범위를 안내합니다. 답변할 준비가 된 질문은 Claude가
-법령 검색과 금융상품 조회 도구의 사용 여부를 결정하고, 조회 결과를 확인한 뒤 답변을
-만듭니다.
-
 Next.js 상담 화면은 `POST /api/chat`으로 요청을 전달하고, FastAPI의
 `/ask-agent/stream` 응답을 SSE(Server-Sent Events)로 받아 처리 상태와 답변을
-순서대로 표시합니다.
+순서대로 표시합니다. FastAPI 내부의 LangGraph 에이전트는 법령 검색과 Finlife 상품
+조회 결과를 사용하며, 답변과 실제 사용한 근거를 분리해 반환합니다.
+
+### 포키가 답변을 만드는 과정
+
+**질문 분석** → **필요한 조건 확인** → **법령·상품 근거 조회** → **답변과 사용 근거 표시**
+
+조건이 부족하면 한 가지를 추가로 묻고, 지원 범위 밖의 질문에는 가능한 상담 범위를
+안내합니다. 같은 상담에서 확인한 조건은 다음 질문에도 이어서 사용합니다.
+
+> [LangGraph Agent의 분기와 근거 조회 흐름 자세히 보기 →](docs/07-langgraph-agent/README.md)
 
 ## 실행하기
 
@@ -152,7 +148,7 @@ uv run fastapi dev
 npm --prefix frontend run dev
 ```
 
-## 데이터 출처와 검색 근거
+## 데이터와 검증 근거
 
 법령 원문은 국가법령정보 공동활용 Open API에서 수집한 XML 스냅샷입니다. 현재
 금융소비자보호법·예금자보호법과 각 시행령, 총 4건을 사용하며 수집 기준일은
@@ -170,9 +166,21 @@ Git에 포함하지 않습니다. 다음 명령은 저장된 조문·청크 수�
 uv run python scripts/verify_index.py
 ```
 
+법령 검색은 KURE-v1 임베딩과 Chroma를 사용하는 의미 검색을 중심으로, 정확한 법률명과
+핵심 표현을 보완하는 BM25 결과를 낮은 비중으로 결합합니다. 두 검색 목록은
+RRF(Reciprocal Rank Fusion)로 합치고 같은 조문을 정리한 뒤 상위 근거를 에이전트에
+전달합니다.
+
 예금·적금 정보는 Finlife API의 은행권 공시를 요청 시점에 조회합니다. 상품 순서는
 LLM이 정하지 않으며, Python 비교 로직이 가입 기간과 사용자가 선택한 금리 기준으로
 결정합니다.
+
+공개 README에서는 실험 수치를 최종 Agent 성능처럼 제시하지 않습니다. 비교 조건과
+한계를 포함한 검증 기록은 다음 문서에서 확인할 수 있습니다.
+
+- [Hybrid Search와 BM25 비교](docs/00-performance-improvement/04-retrieval-robustness/01-hybrid-search-bm25.md)
+- [LangGraph 전환 전후의 RAG 회귀 기준선](docs/03-langsmith-evaluation/11-langgraph-migration-results.md)
+- [Agent 평가 데이터셋과 검증 계약](docs/07-langgraph-agent/05-agent-evaluation-dataset-contract.md)
 
 ## 지원 범위와 주의사항
 
