@@ -7,11 +7,11 @@ from chatbot.agent.graph import create_multi_turn_agent_graph
 from chatbot.agent.model import create_tool_calling_model
 from chatbot.agent.tools import create_agent_tools
 from chatbot.agent.turn_analysis import create_turn_analyzer
-from chatbot.embedding import load_encoder
-from chatbot.graph import create_rag_graph
+from chatbot.law.embedding import load_encoder
+from chatbot.law.vectorstore import open_collection
+from chatbot.rag.graph import create_rag_graph
 from chatbot.observability.langfeather import configure_langfeather, wrap_runnable
-from chatbot.retriever import DEFAULT_TOP_K
-from chatbot.vectorstore import open_collection
+from chatbot.rag.retrieval import DEFAULT_TOP_K
 
 LANGFEATHER_TRACE_NAME = "korean-chatbot-rag"
 LANGFEATHER_AGENT_TRACE_NAME = "korean-chatbot-agent"

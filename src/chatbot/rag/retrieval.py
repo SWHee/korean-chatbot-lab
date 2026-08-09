@@ -5,8 +5,8 @@ import unicodedata
 
 from rank_bm25 import BM25Okapi
 
-from chatbot.embedding import embed_texts
-from chatbot.vectorstore import search
+from chatbot.law.embedding import embed_texts
+from chatbot.law.vectorstore import search
 
 DEFAULT_TOP_K = 5
 DEFAULT_CANDIDATE_K = 50

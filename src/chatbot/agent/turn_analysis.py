@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from chatbot.finlife import (
+from chatbot.products import (
     DEFAULT_PRODUCT_LIMIT,
     DEFAULT_PRODUCT_SORT_BY,
     ProductSortBy,

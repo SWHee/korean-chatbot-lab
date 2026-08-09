@@ -2,7 +2,7 @@
 
 from collections import Counter
 
-from chatbot.agent.evaluation import (
+from chatbot.evaluation.agent_dataset import (
     AGENT_DATASET_VERSION,
     FINLIFE_FIXTURE_VERSION,
     load_agent_evaluation_cases,

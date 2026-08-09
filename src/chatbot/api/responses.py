@@ -6,7 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from pydantic import TypeAdapter
 
 from chatbot.api.models import AgentResponse, AgentSource, AgentToolResult
-from chatbot.finlife import FinancialProductOption
+from chatbot.products import FinancialProductOption
 
 FINANCIAL_PRODUCT_OPTION_ADAPTER = TypeAdapter(FinancialProductOption)
 

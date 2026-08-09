@@ -6,7 +6,7 @@ from typing import Literal
 import pytest
 from pydantic import BaseModel
 
-import chatbot.anthropic_generator as anthropic_module
+import chatbot.generation.anthropic as anthropic_module
 
 
 class ExampleResponse(BaseModel):

@@ -7,8 +7,8 @@
 import torch
 from compare_embeddings import ANSWER_ARTICLE_VERSION, QUESTIONS
 
-from chatbot.embedding import load_encoder
-from chatbot.vectorstore import open_collection, search
+from chatbot.law.embedding import load_encoder
+from chatbot.law.vectorstore import open_collection, search
 
 
 def article_top5(scores: dict) -> list:

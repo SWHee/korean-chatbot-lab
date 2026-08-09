@@ -3,8 +3,8 @@
 import torch
 import pytest
 
-import chatbot.retriever as retriever_module
-from chatbot.retriever import embed_query
+import chatbot.rag.retrieval as retriever_module
+from chatbot.rag.retrieval import embed_query
 
 
 class FakeEncoder:

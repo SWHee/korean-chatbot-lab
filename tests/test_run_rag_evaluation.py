@@ -1,21 +1,18 @@
 """LangSmith 선택 문항 experiment 실행 스크립트 테스트"""
 
-from pathlib import Path
-from runpy import run_path
 from types import SimpleNamespace
 
 import pytest
 
 
-SCRIPT = run_path(
-    Path(__file__).resolve().parent.parent / "scripts" / "run_rag_evaluation.py"
+from chatbot.evaluation.runner import (
+    DATASET_NAME,
+    create_graph_evaluation_target,
+    describe_generator,
+    find_dataset_example,
+    run_full_dataset_experiment,
+    run_selected_questions_experiment,
 )
-DATASET_NAME = SCRIPT["DATASET_NAME"]
-create_graph_evaluation_target = SCRIPT["create_graph_evaluation_target"]
-describe_generator = SCRIPT["describe_generator"]
-find_dataset_example = SCRIPT["find_dataset_example"]
-run_full_dataset_experiment = SCRIPT["run_full_dataset_experiment"]
-run_selected_questions_experiment = SCRIPT["run_selected_questions_experiment"]
 
 
 class FakeClient:

@@ -1,6 +1,6 @@
 """법령 RAG 체인 단위 테스트"""
 
-import chatbot.rag as rag_module
+import chatbot.rag.generation as rag_module
 
 
 class FakeGenerator:

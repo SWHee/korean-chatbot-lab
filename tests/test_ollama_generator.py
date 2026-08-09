@@ -6,7 +6,7 @@ from typing import Literal
 import pytest
 from pydantic import BaseModel, ValidationError
 
-import chatbot.ollama_generator as ollama_module
+import chatbot.generation.ollama as ollama_module
 
 
 class ExampleResponse(BaseModel):

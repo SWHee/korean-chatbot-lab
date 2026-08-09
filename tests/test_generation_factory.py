@@ -2,7 +2,7 @@
 
 import pytest
 
-import chatbot.generator_backend as backend_module
+import chatbot.generation.factory as backend_module
 
 
 def test_create_generator_selects_anthropic_by_default(monkeypatch) -> None:

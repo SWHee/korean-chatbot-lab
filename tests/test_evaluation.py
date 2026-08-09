@@ -1,6 +1,6 @@
 """RAG 평가 실행 함수 단위 테스트"""
 
-import chatbot.evaluation as evaluation_module
+import chatbot.evaluation.rag_dataset as evaluation_module
 
 
 def test_run_rag_evaluation_returns_answer_sources_and_contexts(monkeypatch) -> None:

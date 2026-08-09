@@ -4,7 +4,8 @@ import os
 
 import pytest
 
-import chatbot.finlife as finlife_module
+import chatbot.products as finlife_module
+import chatbot.products.client as finlife_client
 from chatbot.settings import load_local_env
 
 
@@ -95,7 +96,7 @@ def test_fetch_deposit_products_returns_raw_result(monkeypatch) -> None:
         return response
 
     monkeypatch.setenv(finlife_module.FINLIFE_API_KEY_ENV, "test-api-key")
-    monkeypatch.setattr(finlife_module.httpx, "get", fake_get)
+    monkeypatch.setattr(finlife_client.httpx, "get", fake_get)
 
     actual = finlife_module.fetch_deposit_products()
 
@@ -125,7 +126,7 @@ def test_fetch_deposit_products_rejects_body_error(monkeypatch) -> None:
 
     monkeypatch.setenv(finlife_module.FINLIFE_API_KEY_ENV, "test-api-key")
     monkeypatch.setattr(
-        finlife_module.httpx,
+        finlife_client.httpx,
         "get",
         lambda *args, **kwargs: response,
     )
@@ -168,7 +169,7 @@ def test_fetch_saving_products_returns_raw_result(monkeypatch) -> None:
         return response
 
     monkeypatch.setenv(finlife_module.FINLIFE_API_KEY_ENV, "test-api-key")
-    monkeypatch.setattr(finlife_module.httpx, "get", fake_get)
+    monkeypatch.setattr(finlife_client.httpx, "get", fake_get)
 
     actual = finlife_module.fetch_saving_products()
 
@@ -196,7 +197,7 @@ def test_fetch_saving_products_rejects_body_error(monkeypatch) -> None:
 
     monkeypatch.setenv(finlife_module.FINLIFE_API_KEY_ENV, "test-api-key")
     monkeypatch.setattr(
-        finlife_module.httpx,
+        finlife_client.httpx,
         "get",
         lambda *args, **kwargs: response,
     )

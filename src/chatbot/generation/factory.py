@@ -2,8 +2,8 @@
 
 import os
 
-from chatbot.anthropic_generator import AnthropicGenerator
-from chatbot.ollama_generator import OllamaGenerator
+from chatbot.generation.anthropic import AnthropicGenerator
+from chatbot.generation.ollama import OllamaGenerator
 
 
 DEFAULT_BACKEND = "anthropic"
@@ -18,10 +18,4 @@ def create_generator():
         return AnthropicGenerator()
     if backend == "ollama":
         return OllamaGenerator()
-    if backend == "hf":
-        # torch 적재 비용 때문에 hf 선택 시에만 import
-        from chatbot.generator import Generator
-
-        return Generator()
-
     raise ValueError(f"unknown {BACKEND_ENV}: {backend}")

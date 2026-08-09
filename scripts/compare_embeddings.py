@@ -12,8 +12,8 @@ from pathlib import Path
 import torch
 from sentence_transformers import SentenceTransformer
 
-from chatbot.chunking import chunk_articles
-from chatbot.statutes import parse_law
+from chatbot.law.chunking import chunk_articles
+from chatbot.law.statutes import parse_law
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "laws"
 ANSWER_ARTICLE_VERSION = "embedding-selection-v0"

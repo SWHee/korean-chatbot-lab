@@ -6,7 +6,7 @@ import pytest
 from google.genai.errors import ServerError
 from pydantic import ValidationError
 
-from chatbot.evaluators import (
+from chatbot.evaluation.metrics import (
     JudgeResult,
     build_faithfulness_feedback,
     evaluate_faithfulness_run,

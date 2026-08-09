@@ -1,6 +1,6 @@
 """법령 RAG StateGraph 실행 흐름 검증"""
 
-from chatbot import graph as graph_module
+import chatbot.rag.graph as graph_module
 
 
 def test_rag_graph_retrieves_articles_before_generating_answer(monkeypatch) -> None:

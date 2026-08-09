@@ -7,7 +7,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable, RunnableLambda
 from pydantic import BaseModel, ConfigDict, Field
 
-from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
+from chatbot.rag.retrieval import DEFAULT_TOP_K, retrieve_articles
 
 
 INSUFFICIENT_EVIDENCE_MESSAGE = (

@@ -1,6 +1,6 @@
 import torch
 
-from chatbot.embedding import MODEL_NAME, embed_texts
+from chatbot.law.embedding import MODEL_NAME, embed_texts
 
 
 class FakeEncoder:

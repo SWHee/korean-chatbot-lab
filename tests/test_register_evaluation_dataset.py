@@ -1,19 +1,13 @@
 """LangSmith 평가 Dataset 등록 스크립트 테스트"""
 
-from pathlib import Path
-from runpy import run_path
 from types import SimpleNamespace
 
-
-SCRIPT = run_path(
-    Path(__file__).resolve().parent.parent
-    / "scripts"
-    / "register_evaluation_dataset.py"
+from chatbot.evaluation.registry import (
+    DATASET_NAME,
+    build_langsmith_example,
+    load_dataset_rows,
+    register_dataset,
 )
-DATASET_NAME = SCRIPT["DATASET_NAME"]
-build_langsmith_example = SCRIPT["build_langsmith_example"]
-load_dataset_rows = SCRIPT["load_dataset_rows"]
-register_dataset = SCRIPT["register_dataset"]
 
 
 class FakeClient:

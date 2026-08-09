@@ -4,7 +4,7 @@ import httpx
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from chatbot.finlife import (
+from chatbot.products import (
     DEFAULT_PRODUCT_LIMIT,
     DEFAULT_PRODUCT_SORT_BY,
     ProductSortBy,
@@ -16,7 +16,7 @@ from chatbot.finlife import (
     select_deposit_products,
     select_saving_products,
 )
-from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
+from chatbot.rag.retrieval import DEFAULT_TOP_K, retrieve_articles
 
 
 class SearchLawArticlesInput(BaseModel):

@@ -5,8 +5,8 @@ from typing import NotRequired, TypedDict
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
 
-from chatbot.rag import answer_question, stream_answer_question
-from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
+from chatbot.rag.generation import answer_question, stream_answer_question
+from chatbot.rag.retrieval import DEFAULT_TOP_K, retrieve_articles
 
 
 class RagState(TypedDict):

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from chatbot.statutes import parse_law
+from chatbot.law.statutes import parse_law
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "laws"
 

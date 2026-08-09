@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 
-from chatbot.finlife import FinancialProductOption
+from chatbot.products import FinancialProductOption
 
 
 class RagRequest(BaseModel):

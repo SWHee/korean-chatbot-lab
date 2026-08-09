@@ -2,7 +2,7 @@ import uuid
 
 import chromadb
 
-from chatbot.vectorstore import resolve_index_dir, search
+from chatbot.law.vectorstore import resolve_index_dir, search
 
 
 def make_collection():

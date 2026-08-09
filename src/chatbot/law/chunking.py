@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from chatbot.statutes import Article
+from chatbot.law.statutes import Article
 
 # 조문 전체가 삭제된 스텁 ("제19조 삭제 <1997.12.31>" 한 줄)
 _DELETED_STUB = re.compile(r"^제\d+조(의\d+)?\s*삭제\s*<")

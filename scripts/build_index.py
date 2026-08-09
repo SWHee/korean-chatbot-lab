@@ -12,10 +12,10 @@ from pathlib import Path
 
 import chromadb
 
-from chatbot.chunking import chunk_articles
-from chatbot.embedding import load_encoder, embed_texts
-from chatbot.statutes import parse_law
-from chatbot.vectorstore import COLLECTION_NAME, resolve_index_dir
+from chatbot.law.chunking import chunk_articles
+from chatbot.law.embedding import embed_texts, load_encoder
+from chatbot.law.statutes import parse_law
+from chatbot.law.vectorstore import COLLECTION_NAME, resolve_index_dir
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "laws"
 

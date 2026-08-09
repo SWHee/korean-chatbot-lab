@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from chatbot.statutes import parse_law
+from chatbot.law.statutes import parse_law
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

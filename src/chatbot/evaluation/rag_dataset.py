@@ -1,7 +1,7 @@
 """현재 법령 RAG를 Dataset 평가에서 실행하는 함수"""
 
-from chatbot.rag import answer_question, format_context
-from chatbot.retriever import DEFAULT_TOP_K, retrieve_articles
+from chatbot.rag.generation import answer_question, format_context
+from chatbot.rag.retrieval import DEFAULT_TOP_K, retrieve_articles
 
 
 DATASET_NAME = "korean-chatbot-rag-v1-dev"

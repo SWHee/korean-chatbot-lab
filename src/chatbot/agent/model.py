@@ -8,7 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from chatbot.agent.tools import AGENT_TOOL_SCHEMAS
-from chatbot.anthropic_generator import (
+from chatbot.generation.anthropic import (
     DEFAULT_MODEL_ID,
     MAX_OUTPUT_TOKENS,
     MODEL_ENV,

@@ -6,7 +6,10 @@ from pathlib import Path
 import chromadb
 
 DEFAULT_INDEX_DIR = (
-    Path(__file__).resolve().parent.parent.parent / "data" / "index" / "chroma"
+    Path(__file__).resolve().parent.parent.parent.parent
+    / "data"
+    / "index"
+    / "chroma"
 )
 COLLECTION_NAME = "statutes"
 

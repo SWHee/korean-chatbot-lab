@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from chatbot.generator_backend import create_generator
+from chatbot.generation import create_generator
 from chatbot.observability.langfeather import shutdown_langfeather
 from chatbot.settings import load_local_env
 
