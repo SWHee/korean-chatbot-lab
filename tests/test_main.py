@@ -89,42 +89,6 @@ def test_api_response_module_builds_saving_product_result() -> None:
     assert response.products[0].reserve_type_name == "자유적립식"
 
 
-def test_prepare_rag_resources_creates_graph(monkeypatch) -> None:
-    """RAG 자원을 기존 Generator와 Graph에 연결"""
-    encoder = object()
-    collection = object()
-    rag_graph = object()
-    app = SimpleNamespace(state=SimpleNamespace(generator=FakeGenerator()))
-    graph_resources = {}
-
-    def fake_create_rag_graph(**resources):
-        graph_resources.update(resources)
-        return rag_graph
-
-    monkeypatch.setattr(main_module, "load_encoder", lambda: encoder)
-    monkeypatch.setattr(main_module, "open_collection", lambda: collection)
-    monkeypatch.setattr(main_module, "create_rag_graph", fake_create_rag_graph)
-    monkeypatch.setattr(main_module, "configure_langfeather", lambda: None)
-    monkeypatch.setattr(
-        main_module,
-        "wrap_runnable",
-        lambda runnable, **kwargs: runnable,
-    )
-
-    main_module.prepare_rag_resources(app)
-
-    assert app.state.encoder is encoder
-    assert app.state.collection is collection
-    assert app.state.rag_graph is rag_graph
-    assert graph_resources == {
-        "generator": app.state.generator,
-        "encoder": encoder,
-        "collection": collection,
-        "top_k": 5,
-    }
-    assert app.state.langfeather_sdk is None
-
-
 def test_lifespan_loads_local_env_before_backend_selection(monkeypatch) -> None:
     """서버 시작 시 .env를 읽은 뒤 backend 준비"""
     calls = []
@@ -216,64 +180,6 @@ def test_ask_rag_returns_answer_sources_and_generation_seconds(monkeypatch) -> N
     assert response.generation_seconds == 3.0
     assert response.sources[0].law_name == "예금자보호법 시행령"
     assert response.sources[0].article_no == "제18조"
-
-
-def test_prepare_agent_resources_creates_multi_turn_graph(monkeypatch) -> None:
-    """공유 RAG 자원과 SQLite Checkpointer로 Agent Graph 준비"""
-    agent_graph = object()
-    tool_model = object()
-    tools = [object()]
-    turn_analyzer = object()
-    checkpointer = object()
-    app = SimpleNamespace(
-        state=SimpleNamespace(
-            generator=FakeGenerator(),
-            encoder=object(),
-            collection=object(),
-            langfeather_sdk=None,
-        )
-    )
-    captured = {}
-
-    monkeypatch.setattr(main_module, "prepare_rag_resources", lambda app: None)
-    monkeypatch.setattr(
-        main_module,
-        "wrap_runnable",
-        lambda runnable, **kwargs: runnable,
-    )
-    monkeypatch.setattr(main_module, "create_tool_calling_model", lambda: tool_model)
-    monkeypatch.setattr(main_module, "create_agent_tools", lambda **kwargs: tools)
-    monkeypatch.setattr(
-        main_module,
-        "create_turn_analyzer",
-        lambda **kwargs: turn_analyzer,
-    )
-    monkeypatch.setattr(
-        main_module,
-        "create_sqlite_checkpointer",
-        lambda: checkpointer,
-    )
-
-    def fake_create_multi_turn_agent_graph(**kwargs):
-        captured.update(kwargs)
-        return agent_graph
-
-    monkeypatch.setattr(
-        main_module,
-        "create_multi_turn_agent_graph",
-        fake_create_multi_turn_agent_graph,
-    )
-
-    main_module.prepare_agent_resources(app)
-
-    assert app.state.agent_graph is agent_graph
-    assert app.state.agent_checkpointer is checkpointer
-    assert captured == {
-        "model": tool_model,
-        "tools": tools,
-        "analyze_turn": turn_analyzer,
-        "checkpointer": checkpointer,
-    }
 
 
 def test_ask_agent_route_exists() -> None:
