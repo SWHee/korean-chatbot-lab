@@ -5,6 +5,10 @@
 - 상태: 18단계 멀티턴 Agent UI 완료, 15단계 evaluator 구현·검증 대기
 - 현재 기준선: SQLite 멀티턴 조건 병합 기반 Agent API와 Agent 개발 Dataset
 
+> 2026-08-09 구조 개선에서 Agent 이전 학습 단계의 고정 Routed Workflow 구현과 테스트를
+> 제거했다. 아래 8~10단계 내용은 당시 학습·전환 과정을 설명하는 기록이며, 현재 실행
+> 경로는 `agent/graph.py`의 멀티턴 Tool-calling Agent다.
+
 ## 문서 역할
 
 이 문서는 Finlife client부터 멀티턴 Agent v1까지의 **구현 순서와 단계별 완료

@@ -1,6 +1,10 @@
 """현재 대화와 저장된 조건을 함께 분석하는 계약 검증"""
 
-from chatbot.agent.turn_analysis import TurnIntent, create_turn_analyzer
+from chatbot.agent.turn_analysis import (
+    ProductFilters,
+    TurnIntent,
+    create_turn_analyzer,
+)
 
 
 class FakeGenerator:
@@ -28,3 +32,10 @@ def test_turn_analyzer_includes_saved_preferences_in_structured_request() -> Non
     assert result == TurnIntent(intent="product", term_months=12)
     assert "deposit" in generator.messages[1]["content"]
     assert "12개월이요." in generator.messages[1]["content"]
+
+
+def test_product_filters_reports_missing_required_preferences() -> None:
+    """Agent 상품 조회 전 부족한 조건 확인"""
+    filters = ProductFilters(product_type="saving")
+
+    assert filters.missing_required_fields() == ["term_months"]

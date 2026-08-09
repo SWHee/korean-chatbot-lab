@@ -1,5 +1,8 @@
 # 불완전한 mixed 질문의 500 오류
 
+> 이 문서는 Agent 이전 고정 Routed Workflow에서 발생한 문제 기록이다. 해당 Workflow
+> 구현은 2026-08-09 구조 개선에서 제거했으며 현재 멀티턴 Agent에는 사용하지 않는다.
+
 ## 증상
 
 Swagger의 `/ask-workflow`에 다음 질문을 보냈을 때 HTTP 500이 발생했다.

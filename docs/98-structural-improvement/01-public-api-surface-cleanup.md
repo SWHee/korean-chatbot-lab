@@ -1,7 +1,7 @@
 ---
 date: 2026-08-08
 status: completed
-result: 현재 서비스와 법령 진단에 필요한 API만 공개하고 과거 Workflow는 내부 코드로 보존
+result: 현재 서비스와 법령 진단에 필요한 API만 공개하고 과거 Workflow endpoint 제거
 ---
 
 # 공개 API 경로 정리
@@ -19,9 +19,9 @@ Workflow API까지 함께 노출하고 있었다. 프론트는 `/ask-agent/strea
 - `/ask-rag/stream`: 현재 프론트에서 사용하지 않아 공개 API에서 제거
 - `/ask-workflow`: Agent 이전의 고정 라우팅 학습 결과이므로 공개 API에서 제거
 
-`create_rag_graph()`와 `create_routed_workflow_graph()`는 삭제하지 않았다. 전자는 기존
-24문항 법령 회귀 평가를 이용할 경우(Agentic RAG로 넘어오면서, 현재는 기존 선형 구조 평가 베이스라인 지표와 비교해도 되는 것일까? 라는 의문점에서 시작해서 나중에 개선 지표를 쓸 때 애매하다고 생각했다)에 사용하고, 후자는 LangGraph의 고정 분기·혼합 경로를 검증한
-내부 코드와 테스트로 보존.
+`create_rag_graph()`는 기존 24문항 법령 회귀 평가와 `/ask-rag` 진단을 위해 유지했다.
+고정 분기 Workflow 코드는 이 작업 시점에는 학습 기록으로 남겼지만, 현재 Agent에서
+사용하지 않는 것이 확인되어 후속 구조 개선에서 제거했다.
 
 ## 적용
 
@@ -33,7 +33,6 @@ Workflow API까지 함께 노출하고 있었다. 프론트는 `/ask-agent/strea
 ## 결과
 
 Swagger에는 `/ask-rag`, `/ask-agent`, `/ask-agent/stream`만 상담 관련 경로로 남아있다.
-내부 RAG 평가와 Routed Workflow 테스트는 기존 그래프를 직접 사용하므로 영향을 받지
-않음을 확인했다.
+내부 RAG 평가는 기존 법령 Graph를 직접 사용하므로 영향을 받지 않음을 확인했다.
 
 검증: `149 passed, 2 skipped`

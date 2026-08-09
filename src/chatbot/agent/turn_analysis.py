@@ -6,10 +6,16 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from chatbot.finlife import ProductSortBy, ProductType
+from chatbot.finlife import (
+    DEFAULT_PRODUCT_LIMIT,
+    DEFAULT_PRODUCT_SORT_BY,
+    ProductSortBy,
+    ProductType,
+)
 
 
 TurnIntentType = Literal["law", "product", "mixed", "out_of_scope"]
+MissingProductField = Literal["product_type", "term_months"]
 
 TURN_ANALYSIS_SYSTEM_PROMPT = """당신은 예·적금 금융 상담 Agent의 대화 조건 분석기입니다.
 사용자에게 답변하지 말고 전달된 JSON schema에 맞는 결과만 반환하세요.
@@ -32,6 +38,26 @@ class TurnIntent(BaseModel):
     term_months: int | None = Field(default=None, ge=1)
     sort_by: ProductSortBy | None = None
     limit: int | None = Field(default=None, ge=1)
+
+
+class ProductFilters(BaseModel):
+    """멀티턴에서 누적한 예·적금 비교 조건"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product_type: ProductType | None = None
+    term_months: int | None = Field(default=None, ge=1)
+    sort_by: ProductSortBy = DEFAULT_PRODUCT_SORT_BY
+    limit: int = Field(default=DEFAULT_PRODUCT_LIMIT, ge=1)
+
+    def missing_required_fields(self) -> list[MissingProductField]:
+        """상품 조회 전 추가로 필요한 필드 목록"""
+        missing_fields = []
+        if self.product_type is None:
+            missing_fields.append("product_type")
+        if self.term_months is None:
+            missing_fields.append("term_months")
+        return missing_fields
 
 
 def create_turn_analyzer(*, generator) -> Callable[..., TurnIntent]:

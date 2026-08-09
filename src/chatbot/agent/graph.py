@@ -12,8 +12,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from chatbot.agent.model import TOOL_CALLING_SYSTEM_PROMPT
-from chatbot.agent.turn_analysis import TurnIntent
-from chatbot.graph import OUT_OF_SCOPE_MESSAGE, ProductFilters
+from chatbot.agent.turn_analysis import ProductFilters, TurnIntent
 
 
 MAX_AGENT_TOOL_CALLS = 4
@@ -24,6 +23,10 @@ AGENT_REPEAT_CALL_MESSAGE = (
 AGENT_CALL_LIMIT_MESSAGE = (
     "한 질문에서 조회 가능한 횟수를 모두 사용했어요. "
     "원하는 상품 종류나 기간을 더 구체적으로 알려주세요."
+)
+OUT_OF_SCOPE_MESSAGE = (
+    "현재는 예금·적금 상품 비교와 금융소비자보호 법령 안내를 도와드릴 수 있어요.\n"
+    "예: ‘12개월 정기예금을 비교해 주세요’ 또는 ‘예금자보호 한도를 알려주세요’"
 )
 
 AgentNextNode = Literal["record_tool_calls", "stop_repeated_call", "__end__"]
