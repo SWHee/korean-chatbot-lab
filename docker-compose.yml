@@ -47,7 +47,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import os, urllib.request; from chatbot.vectorstore import open_collection; [os.environ[name] for name in ('ANTHROPIC_API_KEY', 'FINLIFE_API_KEY')]; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json'); open_collection(); assert os.access('/app/.runtime', os.W_OK)",
+          "import os, urllib.request; from chatbot.law.vectorstore import open_collection; [os.environ[name] for name in ('ANTHROPIC_API_KEY', 'FINLIFE_API_KEY')]; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json'); open_collection(); assert os.access('/app/.runtime', os.W_OK)",
         ]
       interval: 10s
       timeout: 5s
