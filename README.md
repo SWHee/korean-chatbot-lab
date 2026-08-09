@@ -73,14 +73,13 @@
 
 ## 핀봄의 작동 방식
 
-### 시스템 요청 흐름
+### 시스템 구성과 요청 흐름
 
 ![사용자 질문이 Next.js, FastAPI와 LangGraph 에이전트를 거쳐 법령·금융상품 근거가 포함된 답변으로 이어지는 흐름](docs/assets/finbom-consultation-flow.svg)
 
-Next.js 상담 화면은 `POST /api/chat`으로 요청을 전달하고, FastAPI의
-`/ask-agent/stream` 응답을 SSE(Server-Sent Events)로 받아 처리 상태와 답변을
-순서대로 표시합니다. FastAPI 내부의 LangGraph 에이전트는 법령 검색과 Finlife 상품
-조회 결과를 사용하며, 답변과 실제 사용한 근거를 분리해 반환합니다.
+Next.js 상담 화면은 FastAPI의 `/ask-agent/stream`으로 질문을 전달합니다. LangGraph
+Agent는 이전 대화 조건을 이어받아 필요한 법령과 예·적금 공시를 조회하고, FastAPI는
+답변·법령 근거·비교 상품을 SSE(Server-Sent Events)로 화면에 전달합니다.
 
 ### 포키가 답변을 만드는 과정
 
@@ -89,7 +88,7 @@ Next.js 상담 화면은 `POST /api/chat`으로 요청을 전달하고, FastAPI�
 조건이 부족하면 한 가지를 추가로 묻고, 지원 범위 밖의 질문에는 가능한 상담 범위를
 안내합니다. 같은 상담에서 확인한 조건은 다음 질문에도 이어서 사용합니다.
 
-> [LangGraph Agent의 분기와 근거 조회 흐름 자세히 보기 →](docs/07-langgraph-agent/README.md)
+> [LangGraph Agent의 분기·Tool Calling·반복 흐름 자세히 보기 →](docs/assets/finbom-agent-flow.svg)
 
 ## 실행하기
 
@@ -154,8 +153,7 @@ npm --prefix frontend run dev
 금융소비자보호법·예금자보호법과 각 시행령, 총 4건을 사용하며 수집 기준일은
 **2026-07-06**입니다.
 
-- [법령 XML의 출처와 수집 기준](data/laws/README.md)
-- [버전 관리되는 법령 원문](data/laws/)
+- [법령 XML 원문·출처와 수집 기준](data/laws/README.md)
 - [RAG 개발·회귀평가 데이터셋](data/evaluation/README.md)
 
 Chroma 인덱스(`data/index/`)는 법령 원문에서 다시 만들 수 있는 로컬 산출물이므로
@@ -180,7 +178,6 @@ LLM이 정하지 않으며, Python 비교 로직이 가입 기간과 사용자�
 
 - [Hybrid Search와 BM25 비교](docs/00-performance-improvement/04-retrieval-robustness/01-hybrid-search-bm25.md)
 - [LangGraph 전환 전후의 RAG 회귀 기준선](docs/03-langsmith-evaluation/11-langgraph-migration-results.md)
-- [Agent 평가 데이터셋과 검증 계약](docs/07-langgraph-agent/05-agent-evaluation-dataset-contract.md)
 
 ## 지원 범위와 주의사항
 
@@ -193,8 +190,8 @@ LLM이 정하지 않으며, Python 비교 로직이 가입 기간과 사용자�
 
 ## 개발 문서
 
-공개 README는 현재 실행 가능한 기능과 사용법만 다룹니다. 구현 예정 작업, README
-핫픽스, 설계 결정, 평가·실험 결과, 문제 해결 기록과 회고는
+공개 README는 현재 실행 가능한 기능과 사용법만 다룹니다. 구현 예정 작업, 설계 결정,
+평가·실험 결과, 문제 해결 기록과 회고는
 [개발 문서 허브](docs/README.md)에서 역할별로 관리합니다.
 
 ## 저장소 구조

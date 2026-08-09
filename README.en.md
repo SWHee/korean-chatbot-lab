@@ -158,8 +158,7 @@ The legal corpus is an XML snapshot collected from Korea's National Law Informat
 currently covers four documents: the Financial Consumer Protection Act, the Depositor Protection
 Act, and both enforcement decrees. The snapshot date is **2026-07-06**.
 
-- [Legal XML sources and collection notes (KO)](data/laws/README.md)
-- [Versioned legal source files](data/laws/)
+- [Legal XML sources, files, and collection notes (KO)](data/laws/README.md)
 - [RAG development and regression dataset (KO)](data/evaluation/README.md)
 
 The Chroma index (`data/index/`) is a reproducible local artifact and is not committed. Inspect the
@@ -182,7 +181,6 @@ Evaluation conditions, results, and limitations are recorded in the following do
 
 - [Hybrid Search and BM25 comparison (KO)](docs/00-performance-improvement/04-retrieval-robustness/01-hybrid-search-bm25.md)
 - [RAG regression baseline before and after the LangGraph migration (KO)](docs/03-langsmith-evaluation/11-langgraph-migration-results.md)
-- [Agent evaluation dataset and validation contract (KO)](docs/07-langgraph-agent/05-agent-evaluation-dataset-contract.md)
 
 ## Scope and limitations
 
@@ -196,8 +194,8 @@ Evaluation conditions, results, and limitations are recorded in the following do
 ## Development documentation
 
 This public README covers only the current runnable features and usage. Planned implementation,
-README hotfixes, architecture decisions, evaluations, experiments, troubleshooting notes, and
-retrospectives are organized in the [development documentation hub (KO)](docs/README.md).
+architecture decisions, evaluations, experiments, troubleshooting notes, and retrospectives are
+organized in the [development documentation hub (KO)](docs/README.md).
 
 ## Repository layout
 

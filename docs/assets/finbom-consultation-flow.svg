@@ -1,98 +1,179 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 620" role="img" aria-labelledby="title desc">
-  <title id="title">Finbom consultation flow</title>
-  <desc id="desc">A user question moves through the Next.js chat, FastAPI, and the LangGraph agent. The agent retrieves Korean law with hybrid search and compares Finlife deposit or installment-savings disclosures, then streams an answer with its sources.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1500" viewBox="0 0 900 1500" role="img" aria-labelledby="title desc">
+  <title id="title">핀봄 시스템 구성도</title>
+  <desc id="desc">사용자의 금융 상담 질문이 Next.js와 FastAPI를 거쳐 LangGraph Agent로 전달된다. Agent는 Claude, Chroma 법령 색인, Finlife 예적금 공시, SQLite 대화 상태를 사용하고 답변과 근거를 SSE로 반환한다.</desc>
 
   <defs>
-    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
-      <path d="M64 0H0V64" fill="none" stroke="#8BB8E8" stroke-opacity=".045"/>
+    <pattern id="grid" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0H0V60" fill="none" stroke="#8BB9E8" stroke-opacity=".035"/>
     </pattern>
-    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#173253"/>
-      <stop offset="1" stop-color="#0B1220"/>
-    </linearGradient>
-    <filter id="shadow" x="-20%" y="-30%" width="140%" height="170%">
-      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#020713" flood-opacity=".38"/>
+    <radialGradient id="glow" cx="50%" cy="40%" r="65%">
+      <stop offset="0" stop-color="#244A6B" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#0B1220" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-25%" width="140%" height="165%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#07172A" flood-opacity=".16"/>
     </filter>
-    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
-      <path d="M0 0L12 6L0 12Z" fill="#77A9D8"/>
+    <marker id="arrow-request" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
+      <path d="M0 0L11 5.5L0 11Z" fill="#244A6B"/>
+    </marker>
+    <marker id="arrow-response" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto">
+      <path d="M0 0L11 5.5L0 11Z" fill="#2F6B64"/>
+    </marker>
+    <marker id="arrow-external" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0L10 5L0 10Z" fill="#8BB9E8"/>
+    </marker>
+    <marker id="arrow-state" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" fill="#2F6B64"/>
     </marker>
     <style>
-      .sans { font-family: Inter, "Noto Sans KR", "Apple SD Gothic Neo", Arial, sans-serif; }
-      .eyebrow { fill:#79E2D0; font-size:14px; font-weight:800; letter-spacing:2.2px; }
-      .title { fill:#F6F9FC; font-size:42px; font-weight:760; letter-spacing:-1px; }
-      .subtitle { fill:#9EB3C9; font-size:18px; font-weight:520; }
-      .step { fill:#89BDF0; font-size:12px; font-weight:800; letter-spacing:1.6px; }
-      .card-title { fill:#F6F9FC; font-size:21px; font-weight:740; }
-      .card-copy { fill:#9EB3C9; font-size:14px; font-weight:520; }
-      .chip { fill:#D8E6F4; font-size:12px; font-weight:650; }
-      .note { fill:#8EA5BC; font-size:13px; font-weight:520; }
-      .card { fill:#111C2F; stroke:#36506E; stroke-width:1.4; }
-      .card-accent { fill:#173253; stroke:#78ACDB; stroke-width:1.8; }
-      .flow { fill:none; stroke:#77A9D8; stroke-width:2.4; marker-end:url(#arrow); }
-      .state { fill:none; stroke:#79E2D0; stroke-width:1.6; stroke-dasharray:7 7; }
+      text { font-family: "Pretendard Variable", Pretendard, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+      .eyebrow { fill:#8BB9E8; font-size:13px; font-weight:800; letter-spacing:2.2px; }
+      .heading { fill:#EEF3F8; font-size:34px; font-weight:780; letter-spacing:-1px; }
+      .subtitle { fill:#B6C4D6; font-size:15px; font-weight:520; }
+      .boundary-label { fill:#4E5D70; font-size:11px; font-weight:800; letter-spacing:1.5px; }
+      .type { fill:#244A6B; font-size:11px; font-weight:800; letter-spacing:1.3px; }
+      .type-accent { fill:#2F6B64; font-size:11px; font-weight:800; letter-spacing:1.3px; }
+      .type-dark { fill:#8BB9E8; font-size:11px; font-weight:800; letter-spacing:1.3px; }
+      .title-card { fill:#172033; font-size:22px; font-weight:760; }
+      .title-card-dark { fill:#EEF3F8; font-size:22px; font-weight:760; }
+      .copy { fill:#65758A; font-size:13px; font-weight:540; }
+      .copy-dark { fill:#B6C4D6; font-size:13px; font-weight:540; }
+      .edge-label { fill:#4E5D70; font-size:11px; font-weight:720; }
+      .edge-label-dark { fill:#B6C4D6; font-size:11px; font-weight:720; }
+      .small { fill:#91A3BA; font-size:11px; font-weight:560; }
+      .card { fill:#FFFFFF; stroke:#C3CFDB; stroke-width:1.3; }
+      .card-soft { fill:#F3F6F9; stroke:#C3CFDB; stroke-width:1.3; }
+      .card-agent { fill:#244A6B; stroke:#8BB9E8; stroke-width:1.8; }
+      .card-external { fill:#131F2F; stroke:#40536E; stroke-width:1.4; }
+      .request { fill:none; stroke:#244A6B; stroke-width:2.5; marker-end:url(#arrow-request); }
+      .response { fill:none; stroke:#2F6B64; stroke-width:2.5; marker-end:url(#arrow-response); }
+      .dependency { fill:none; stroke:#8BB9E8; stroke-width:1.9; stroke-dasharray:7 6; marker-end:url(#arrow-external); }
+      .state { fill:none; stroke:#2F6B64; stroke-width:1.9; stroke-dasharray:7 6; }
     </style>
   </defs>
 
-  <rect width="1600" height="620" rx="32" fill="#0B1220"/>
-  <rect width="1600" height="620" rx="32" fill="url(#grid)"/>
-  <ellipse cx="1310" cy="110" rx="330" ry="220" fill="url(#glow)" opacity=".72"/>
+  <rect width="900" height="1500" rx="28" fill="#0B1220"/>
+  <rect width="900" height="1500" rx="28" fill="url(#grid)"/>
+  <rect width="900" height="540" rx="28" fill="url(#glow)"/>
 
-  <g class="sans">
-    <text x="70" y="68" class="eyebrow">FINBOM · EVIDENCE-FIRST CONSULTATION</text>
-    <text x="70" y="122" class="title">From a financial question to a sourced answer</text>
-    <text x="70" y="158" class="subtitle">The interface, agent, and evidence tools stay separate so each result can be inspected.</text>
+  <g>
+    <text x="70" y="68" class="eyebrow">FINBOM · SYSTEM OVERVIEW</text>
+    <text x="70" y="116" class="heading">질문에서 근거 있는 금융 상담까지</text>
+    <text x="70" y="148" class="subtitle">화면·API·Agent가 법령과 금융상품 근거를 확인해 답변과 함께 전달합니다.</text>
 
+    <!-- 사용자 -->
     <g filter="url(#shadow)">
-      <rect x="60" y="230" width="200" height="176" rx="20" class="card"/>
-      <rect x="320" y="230" width="200" height="176" rx="20" class="card"/>
-      <rect x="580" y="230" width="200" height="176" rx="20" class="card"/>
-      <rect x="840" y="230" width="200" height="176" rx="20" class="card-accent"/>
-      <rect x="1100" y="230" width="200" height="176" rx="20" class="card"/>
-      <rect x="1360" y="230" width="180" height="176" rx="20" class="card-accent"/>
+      <rect x="150" y="188" width="600" height="100" rx="18" class="card-external"/>
     </g>
+    <circle cx="198" cy="238" r="21" fill="#1B2D42" stroke="#8BB9E8"/>
+    <circle cx="198" cy="232" r="6.5" fill="#8BB9E8"/>
+    <path d="M181 254Q198 239 215 254" fill="none" stroke="#8BB9E8" stroke-width="2"/>
+    <text x="235" y="226" class="type-dark">USER</text>
+    <text x="235" y="257" class="title-card-dark">금융 상담 사용자</text>
+    <text x="535" y="244" class="copy-dark">법령·예금·적금 질문</text>
 
-    <text x="84" y="266" class="step">01 · ASK</text>
-    <text x="84" y="311" class="card-title">User question</text>
-    <text x="84" y="343" class="card-copy">Law, protection,</text>
-    <text x="84" y="367" class="card-copy">or product terms</text>
+    <!-- 애플리케이션 경계 -->
+    <rect x="70" y="342" width="760" height="790" rx="27" fill="#EDF3F7" stroke="#40536E" stroke-width="1.6"/>
+    <rect x="103" y="325" width="218" height="34" rx="17" fill="#FFFFFF" stroke="#C3CFDB"/>
+    <circle cx="124" cy="342" r="5" fill="#244A6B"/>
+    <text x="140" y="347" class="boundary-label">FINBOM APPLICATION</text>
 
-    <text x="344" y="266" class="step">02 · CHAT</text>
-    <text x="344" y="311" class="card-title">Next.js UI</text>
-    <text x="344" y="343" class="card-copy">Conversation and</text>
-    <text x="344" y="367" class="card-copy">evidence workspace</text>
+    <!-- Next.js -->
+    <g filter="url(#shadow)">
+      <rect x="140" y="389" width="620" height="118" rx="18" class="card"/>
+    </g>
+    <text x="170" y="425" class="type">WEB APPLICATION</text>
+    <text x="170" y="461" class="title-card">Next.js 상담 화면</text>
+    <text x="510" y="442" class="copy">대화·처리 상태 표시</text>
+    <text x="510" y="466" class="copy">답변·근거 패널 분리</text>
+    <rect x="170" y="475" width="145" height="24" rx="12" fill="#E8EFF6"/>
+    <text x="190" y="492" class="edge-label">POST /api/chat</text>
 
-    <text x="604" y="266" class="step">03 · STREAM</text>
-    <text x="604" y="311" class="card-title">FastAPI</text>
-    <text x="604" y="343" class="card-copy">Agent request and</text>
-    <text x="604" y="367" class="card-copy">SSE response</text>
+    <!-- FastAPI -->
+    <g filter="url(#shadow)">
+      <rect x="140" y="565" width="620" height="118" rx="18" class="card"/>
+    </g>
+    <text x="170" y="601" class="type">API APPLICATION</text>
+    <text x="170" y="637" class="title-card">FastAPI</text>
+    <text x="510" y="618" class="copy">요청 검증·Agent 실행</text>
+    <text x="510" y="642" class="copy">SSE 이벤트·최종 응답 변환</text>
+    <rect x="170" y="651" width="162" height="24" rx="12" fill="#E8EFF6"/>
+    <text x="187" y="668" class="edge-label">/ask-agent/stream</text>
 
-    <text x="864" y="266" class="step">04 · DECIDE</text>
-    <text x="864" y="311" class="card-title">LangGraph Agent</text>
-    <text x="864" y="343" class="card-copy">Clarify, guide scope,</text>
-    <text x="864" y="367" class="card-copy">or select a tool</text>
+    <!-- LangGraph -->
+    <g filter="url(#shadow)">
+      <rect x="140" y="741" width="620" height="196" rx="20" class="card-agent"/>
+    </g>
+    <text x="170" y="780" class="type-dark">ORCHESTRATION</text>
+    <text x="170" y="818" class="title-card-dark">LangGraph Agent</text>
+    <text x="170" y="851" class="copy-dark">이전 대화 조건과 현재 질문 분석</text>
+    <text x="170" y="878" class="copy-dark">조건 보완 · 범위 안내 · 근거 Tool 선택</text>
+    <rect x="505" y="790" width="218" height="104" rx="14" fill="#1B3A55" stroke="#74A6D8"/>
+    <text x="530" y="823" class="type-dark">OUTPUT</text>
+    <text x="530" y="852" class="copy-dark">상담 답변</text>
+    <text x="530" y="875" class="copy-dark">법령 근거 · 비교 상품</text>
 
-    <text x="1124" y="266" class="step">05 · RETRIEVE</text>
-    <text x="1124" y="311" class="card-title">Evidence tools</text>
-    <rect x="1124" y="331" width="152" height="28" rx="14" fill="#1B2A40"/>
-    <text x="1200" y="350" text-anchor="middle" class="chip">Law · Dense + BM25</text>
-    <rect x="1124" y="367" width="152" height="28" rx="14" fill="#1B2A40"/>
-    <text x="1200" y="386" text-anchor="middle" class="chip">Finlife · deposits/savings</text>
+    <!-- 내부 저장소 -->
+    <g filter="url(#shadow)">
+      <rect x="105" y="982" width="320" height="112" rx="18" class="card-soft"/>
+      <rect x="475" y="982" width="320" height="112" rx="18" class="card-soft"/>
+    </g>
+    <text x="133" y="1017" class="type-accent">LAW EVIDENCE</text>
+    <text x="133" y="1050" class="title-card" font-size="20">Chroma 법령 색인</text>
+    <text x="133" y="1078" class="copy">KURE 의미 검색 + BM25</text>
+    <text x="503" y="1017" class="type-accent">CONVERSATION STATE</text>
+    <text x="503" y="1050" class="title-card" font-size="20">SQLite Checkpointer</text>
+    <text x="503" y="1078" class="copy">thread_id별 대화 조건 유지</text>
 
-    <text x="1384" y="266" class="step">06 · ANSWER</text>
-    <text x="1384" y="311" class="card-title">Answer</text>
-    <text x="1384" y="343" class="card-copy">Explanation, law,</text>
-    <text x="1384" y="367" class="card-copy">and product data</text>
+    <!-- 아래로 흐르는 요청과 위로 돌아오는 응답 -->
+    <path d="M420 288V375" class="request"/>
+    <rect x="373" y="317" width="70" height="22" rx="11" fill="#131F2F"/>
+    <text x="390" y="333" class="edge-label-dark">질문</text>
+    <path d="M420 507V551" class="request"/>
+    <path d="M420 683V727" class="request"/>
 
-    <path d="M260 318H306" class="flow"/>
-    <path d="M520 318H566" class="flow"/>
-    <path d="M780 318H826" class="flow"/>
-    <path d="M1040 318H1086" class="flow"/>
-    <path d="M1300 318H1346" class="flow"/>
+    <path d="M760 830H790V624H760" class="response"/>
+    <path d="M760 624H805V448H760" class="response"/>
+    <path d="M760 448H820V238H750" class="response"/>
+    <rect x="621" y="520" width="174" height="25" rx="12.5" fill="#E7F0EE"/>
+    <text x="638" y="537" class="edge-label" fill="#2F6B64">SSE 답변·근거·상품</text>
 
-    <rect x="840" y="458" width="460" height="78" rx="18" fill="#0E1A2B" stroke="#2A695F"/>
-    <text x="866" y="489" class="step" fill="#79E2D0">MULTI-TURN STATE</text>
-    <text x="866" y="516" class="note">SQLite restores messages and confirmed product conditions for the same thread.</text>
-    <path d="M940 406V458" class="state"/>
-    <path d="M1200 406V458" class="state"/>
+    <!-- Agent와 내부 저장소 -->
+    <path d="M300 937V968" class="request"/>
+    <rect x="317" y="943" width="82" height="21" rx="10.5" fill="#EDF3F7"/>
+    <text x="330" y="958" class="edge-label">법령 검색</text>
+    <path d="M630 937V968" class="state"/>
+    <rect x="646" y="943" width="88" height="21" rx="10.5" fill="#EDF3F7"/>
+    <text x="659" y="958" class="edge-label" fill="#2F6B64">저장·복원</text>
+
+    <!-- 외부 서비스 -->
+    <text x="70" y="1190" class="eyebrow">CONNECTED EXTERNAL SERVICES</text>
+    <g filter="url(#shadow)">
+      <rect x="105" y="1225" width="320" height="132" rx="18" class="card-external"/>
+      <rect x="475" y="1225" width="320" height="132" rx="18" class="card-external"/>
+    </g>
+    <text x="133" y="1262" class="type-dark">MODEL API</text>
+    <text x="133" y="1297" class="title-card-dark" font-size="20">Anthropic Claude</text>
+    <text x="133" y="1325" class="copy-dark">조건 분석 · Tool Calling</text>
+    <text x="503" y="1262" class="type-dark">FINANCIAL DATA API</text>
+    <text x="503" y="1297" class="title-card-dark" font-size="20">Finlife Open API</text>
+    <text x="503" y="1325" class="copy-dark">은행권 예금·적금 공시</text>
+
+    <path d="M140 838H44V1291H91" class="dependency"/>
+    <rect x="28" y="1103" width="75" height="22" rx="11" fill="#131F2F"/>
+    <text x="39" y="1119" class="edge-label-dark">모델 요청</text>
+    <path d="M760 838H856V1291H809" class="dependency"/>
+    <rect x="797" y="1103" width="75" height="22" rx="11" fill="#131F2F"/>
+    <text x="808" y="1119" class="edge-label-dark">공시 조회</text>
+
+    <!-- 범례 -->
+    <g transform="translate(122 1430)">
+      <line x1="0" y1="0" x2="42" y2="0" stroke="#8BB9E8" stroke-width="2.2"/>
+      <text x="54" y="5" class="small">요청·외부 조회</text>
+      <line x1="235" y1="0" x2="277" y2="0" stroke="#2F6B64" stroke-width="2.5"/>
+      <text x="289" y="5" class="small">SSE 응답</text>
+      <line x1="440" y1="0" x2="482" y2="0" stroke="#2F6B64" stroke-width="1.9" stroke-dasharray="7 6"/>
+      <text x="494" y="5" class="small">대화 상태 저장·복원</text>
+    </g>
   </g>
 </svg>
