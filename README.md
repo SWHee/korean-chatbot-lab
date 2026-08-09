@@ -88,7 +88,7 @@ Agent는 이전 대화 조건을 이어받아 필요한 법령과 예·적금 �
 조건이 부족하면 한 가지를 추가로 묻고, 지원 범위 밖의 질문에는 가능한 상담 범위를
 안내합니다. 같은 상담에서 확인한 조건은 다음 질문에도 이어서 사용합니다.
 
-> [LangGraph Agent의 분기·Tool Calling·반복 흐름 자세히 보기 →](docs/assets/finbom-agent-flow.svg)
+> [LangGraph Agent의 분기·Tool Calling·반복 흐름 자세히 보기 →](docs/07-langgraph-agent/README.md)
 
 ## 실행하기
 
